@@ -1,2 +1,3 @@
 rootProject.name='GoodScanner'
 include ':app'
+include ':sdk'

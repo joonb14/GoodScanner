@@ -45,6 +45,8 @@ android {
     aaptOptions {
         noCompress "tflite"
     }
+
+    ndkVersion "23.1.7779620"
 }
 
 repositories {
@@ -110,6 +112,7 @@ dependencies {
 
     implementation 'com.google.code.gson:gson:2.8.6'
     implementation 'com.google.guava:guava:27.1-android'
+    implementation project(path: ':sdk')
 
     // For how to setup gradle dependencies in Android X, see:
     // https://developer.android.com/training/testing/set-up-project#gradle-dependencies
