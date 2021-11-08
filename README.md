@@ -24,5 +24,5 @@
 
   - Model 결과를 이용하여 실제 document처럼 docx(?) 파일 구성하기
 
-![demo](demo.gif)
+    ![demo](demo.gif)
 
