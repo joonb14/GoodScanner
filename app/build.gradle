@@ -7,7 +7,7 @@ android {
 
     defaultConfig {
         applicationId "com.google.mlkit.vision.demo"
-        minSdkVersion 16
+        minSdkVersion 21
         multiDexEnabled true
         targetSdkVersion 30
 
