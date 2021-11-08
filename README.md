@@ -60,16 +60,15 @@
       - graphicOverlay에 TextGraphic(graphicOverlay, text, shouldGroupRecognizedTextInBlocks)로 인식한 text정보 추가
       - text 정보들이 모두 add 되면 TextGraphic.kt의 draw()를 이용하여 화면에 출력한다
 
-- 요약
+- Text Recognition 결과가 들어있는 변수들
 
-  - Text Recognition 결과가 들어있는 변수들
-    - VisionProcessorBase.kt
-      - this@VisionProcessorBase.onSuccess(**results**, graphicOverlay)
-    - TextRecognitionProcessor.kt
-      - onSuccess(**text**: Text, graphicOverlay: com.good.scanner.GraphicOverlay)
-    - TextGraphic.kt
-      - private val **text**: Text
-      - 여기서 Text의 class 형태를 대충 볼 수 있다.
+  - VisionProcessorBase.kt
+    - this@VisionProcessorBase.onSuccess(**results**, graphicOverlay)
+  - TextRecognitionProcessor.kt
+    - onSuccess(**text**: Text, graphicOverlay: com.good.scanner.GraphicOverlay)
+  - TextGraphic.kt
+    - private val **text**: Text
+    - 여기서 Text의 class 형태를 대충 볼 수 있다.
 
 - Text class 정보
 
@@ -102,3 +101,22 @@
       Log.d(TAG, "Element cornerpoint is: " + Arrays.toString(element.cornerPoints))
       Log.d(TAG, "Element language is: " + element.recognizedLanguage)
     ```
+
+# 개발 방향
+
+1. StillImageActivity.kt에서 imageProcessor.!!processBitmap()으로 Text Recognition을 수행하기 전에 bitmap을 가지고 OpenCV의 기능을 이용해서 bitmap(image)에서 문서를 찾고 정면화한 bitmap을 만들어내야합니다
+
+   - 이 bitmap을 이용하여 pdf 파일을 만들면 스캐너 완성!
+
+   - 이 bitmap을 processBitmap의 parameter로 넘겨주면 text recognition까지 가능!
+
+2. Text Recognition 결과를 예쁘게 visualization합니다
+
+   - 시작은 그냥 일반 web에서 textblock처럼 visualization 
+
+   - Best는 docx 파일처럼 layout까지 따라서 visualization(?)
+
+     - Text의 size를 bounding box의 크기로 유추해서 layout을 비슷하게 맞춰주는 기능 구현
+     - bounding box에 해당되지 않는 부분은 그대로 두어 image와 표 같은 것들은 제 layout 위치에 두도록 한다
+
+     ![image](https://user-images.githubusercontent.com/30307587/140741013-b4f0cc68-401e-4fe5-8988-de4dfa55cdff.png)
