@@ -42,130 +42,130 @@ import java.util.ArrayList
  * available testing Activities.
  */
 class ChooserActivity :
-  AppCompatActivity(),
-  ActivityCompat.OnRequestPermissionsResultCallback,
-  OnItemClickListener {
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    Log.d(com.good.scanner.kotlin.ChooserActivity.Companion.TAG, "onCreate")
-    setContentView(R.layout.activity_chooser)
+        AppCompatActivity(),
+        ActivityCompat.OnRequestPermissionsResultCallback,
+        OnItemClickListener {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        Log.d(com.good.scanner.kotlin.ChooserActivity.Companion.TAG, "onCreate")
+        setContentView(R.layout.activity_chooser)
 
-    // Set up ListView and Adapter
-    val listView =
-      findViewById<ListView>(R.id.test_activity_list_view)
-    val adapter =
-            com.good.scanner.kotlin.ChooserActivity.MyArrayAdapter(this, android.R.layout.simple_list_item_2, com.good.scanner.kotlin.ChooserActivity.Companion.CLASSES)
-    adapter.setDescriptionIds(com.good.scanner.kotlin.ChooserActivity.Companion.DESCRIPTION_IDS)
-    listView.adapter = adapter
-    listView.onItemClickListener = this
+        // Set up ListView and Adapter
+        val listView =
+                findViewById<ListView>(R.id.test_activity_list_view)
+        val adapter =
+                com.good.scanner.kotlin.ChooserActivity.MyArrayAdapter(this, android.R.layout.simple_list_item_2, com.good.scanner.kotlin.ChooserActivity.Companion.CLASSES)
+        adapter.setDescriptionIds(com.good.scanner.kotlin.ChooserActivity.Companion.DESCRIPTION_IDS)
+        listView.adapter = adapter
+        listView.onItemClickListener = this
 
-    if (!allPermissionsGranted()) {
-      getRuntimePermissions()
-    }
-  }
-
-  override fun onItemClick(parent: AdapterView<*>?, view: View, position: Int, id: Long) {
-    val clicked = com.good.scanner.kotlin.ChooserActivity.Companion.CLASSES[position]
-    startActivity(Intent(this, clicked))
-  }
-
-  private fun getRequiredPermissions(): Array<String?> {
-    return try {
-      val info = this.packageManager
-        .getPackageInfo(this.packageName, PackageManager.GET_PERMISSIONS)
-      val ps = info.requestedPermissions
-      if (ps != null && ps.isNotEmpty()) {
-        ps
-      } else {
-        arrayOfNulls(0)
-      }
-    } catch (e: Exception) {
-      arrayOfNulls(0)
-    }
-  }
-
-  private fun allPermissionsGranted(): Boolean {
-    for (permission in getRequiredPermissions()) {
-      permission?.let {
-        if (!isPermissionGranted(this, it)) {
-          return false
+        if (!allPermissionsGranted()) {
+            getRuntimePermissions()
         }
-      }
     }
-    return true
-  }
 
-  private fun getRuntimePermissions() {
-    val allNeededPermissions = ArrayList<String>()
-    for (permission in getRequiredPermissions()) {
-      permission?.let {
-        if (!isPermissionGranted(this, it)) {
-          allNeededPermissions.add(permission)
+    override fun onItemClick(parent: AdapterView<*>?, view: View, position: Int, id: Long) {
+        val clicked = com.good.scanner.kotlin.ChooserActivity.Companion.CLASSES[position]
+        startActivity(Intent(this, clicked))
+    }
+
+    private fun getRequiredPermissions(): Array<String?> {
+        return try {
+            val info = this.packageManager
+                    .getPackageInfo(this.packageName, PackageManager.GET_PERMISSIONS)
+            val ps = info.requestedPermissions
+            if (ps != null && ps.isNotEmpty()) {
+                ps
+            } else {
+                arrayOfNulls(0)
+            }
+        } catch (e: Exception) {
+            arrayOfNulls(0)
         }
-      }
     }
 
-    if (allNeededPermissions.isNotEmpty()) {
-      ActivityCompat.requestPermissions(
-        this, allNeededPermissions.toTypedArray(), com.good.scanner.kotlin.ChooserActivity.Companion.PERMISSION_REQUESTS
-      )
-    }
-  }
-
-  private fun isPermissionGranted(context: Context, permission: String): Boolean {
-    if (ContextCompat.checkSelfPermission(context, permission)
-      == PackageManager.PERMISSION_GRANTED
-    ) {
-      Log.i(com.good.scanner.kotlin.ChooserActivity.Companion.TAG, "Permission granted: $permission")
-      return true
-    }
-    Log.i(com.good.scanner.kotlin.ChooserActivity.Companion.TAG, "Permission NOT granted: $permission")
-    return false
-  }
-
-  private class MyArrayAdapter(
-    private val ctx: Context,
-    resource: Int,
-    private val classes: Array<Class<*>>
-  ) : ArrayAdapter<Class<*>>(ctx, resource, classes) {
-    private var descriptionIds: IntArray? = null
-
-    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-      var view = convertView
-
-      if (convertView == null) {
-        val inflater = ctx.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        view = inflater.inflate(android.R.layout.simple_list_item_2, null)
-      }
-
-      (view!!.findViewById<View>(android.R.id.text1) as TextView).text =
-        classes[position].simpleName
-      descriptionIds?.let {
-        (view.findViewById<View>(android.R.id.text2) as TextView).setText(it[position])
-      }
-
-      return view
+    private fun allPermissionsGranted(): Boolean {
+        for (permission in getRequiredPermissions()) {
+            permission?.let {
+                if (!isPermissionGranted(this, it)) {
+                    return false
+                }
+            }
+        }
+        return true
     }
 
-    fun setDescriptionIds(descriptionIds: IntArray) {
-      this.descriptionIds = descriptionIds
-    }
-  }
+    private fun getRuntimePermissions() {
+        val allNeededPermissions = ArrayList<String>()
+        for (permission in getRequiredPermissions()) {
+            permission?.let {
+                if (!isPermissionGranted(this, it)) {
+                    allNeededPermissions.add(permission)
+                }
+            }
+        }
 
-  companion object {
-    private const val TAG = "ChooserActivity"
-    private const val PERMISSION_REQUESTS = 1
-    private val CLASSES = if (VERSION.SDK_INT < VERSION_CODES.LOLLIPOP)
-      arrayOf<Class<*>>(
-        com.good.scanner.kotlin.StillImageActivity::class.java
-      ) else arrayOf<Class<*>>(
-      com.good.scanner.kotlin.StillImageActivity::class.java
-    )
-    private val DESCRIPTION_IDS = if (VERSION.SDK_INT < VERSION_CODES.LOLLIPOP)
-      intArrayOf(
-        R.string.desc_still_image_activity
-      ) else intArrayOf(
-      R.string.desc_still_image_activity
-    )
-  }
+        if (allNeededPermissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                    this, allNeededPermissions.toTypedArray(), com.good.scanner.kotlin.ChooserActivity.Companion.PERMISSION_REQUESTS
+            )
+        }
+    }
+
+    private fun isPermissionGranted(context: Context, permission: String): Boolean {
+        if (ContextCompat.checkSelfPermission(context, permission)
+                == PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.i(com.good.scanner.kotlin.ChooserActivity.Companion.TAG, "Permission granted: $permission")
+            return true
+        }
+        Log.i(com.good.scanner.kotlin.ChooserActivity.Companion.TAG, "Permission NOT granted: $permission")
+        return false
+    }
+
+    private class MyArrayAdapter(
+            private val ctx: Context,
+            resource: Int,
+            private val classes: Array<Class<*>>
+    ) : ArrayAdapter<Class<*>>(ctx, resource, classes) {
+        private var descriptionIds: IntArray? = null
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            var view = convertView
+
+            if (convertView == null) {
+                val inflater = ctx.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
+                view = inflater.inflate(android.R.layout.simple_list_item_2, null)
+            }
+
+            (view!!.findViewById<View>(android.R.id.text1) as TextView).text =
+                    classes[position].simpleName
+            descriptionIds?.let {
+                (view.findViewById<View>(android.R.id.text2) as TextView).setText(it[position])
+            }
+
+            return view
+        }
+
+        fun setDescriptionIds(descriptionIds: IntArray) {
+            this.descriptionIds = descriptionIds
+        }
+    }
+
+    companion object {
+        private const val TAG = "ChooserActivity"
+        private const val PERMISSION_REQUESTS = 1
+        private val CLASSES = if (VERSION.SDK_INT < VERSION_CODES.LOLLIPOP)
+            arrayOf<Class<*>>(
+                    com.good.scanner.kotlin.StillImageActivity::class.java
+            ) else arrayOf<Class<*>>(
+                com.good.scanner.kotlin.StillImageActivity::class.java
+        )
+        private val DESCRIPTION_IDS = if (VERSION.SDK_INT < VERSION_CODES.LOLLIPOP)
+            intArrayOf(
+                    R.string.desc_still_image_activity
+            ) else intArrayOf(
+                R.string.desc_still_image_activity
+        )
+    }
 }

@@ -47,231 +47,231 @@ import java.util.TimerTask
  */
 abstract class VisionProcessorBase<T>(context: Context) : com.good.scanner.VisionImageProcessor {
 
-  companion object {
-    const val MANUAL_TESTING_LOG = "LogTagForTest"
-    private const val TAG = "VisionProcessorBase"
-  }
-
-  private var activityManager: ActivityManager =
-    context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-  private val fpsTimer = Timer()
-  private val executor = com.good.scanner.ScopedExecutor(TaskExecutors.MAIN_THREAD)
-
-  // Whether this processor is already shut down
-  private var isShutdown = false
-
-  // Used to calculate latency, running in the same thread, no sync needed.
-  private var numRuns = 0
-  private var totalFrameMs = 0L
-  private var maxFrameMs = 0L
-  private var minFrameMs = Long.MAX_VALUE
-  private var totalDetectorMs = 0L
-  private var maxDetectorMs = 0L
-  private var minDetectorMs = Long.MAX_VALUE
-
-  // Frame count that have been processed so far in an one second interval to calculate FPS.
-  private var frameProcessedInOneSecondInterval = 0
-  private var framesPerSecond = 0
-
-  init {
-    fpsTimer.scheduleAtFixedRate(
-      object : TimerTask() {
-        override fun run() {
-          framesPerSecond = frameProcessedInOneSecondInterval
-          frameProcessedInOneSecondInterval = 0
-        }
-      },
-      0,
-      1000
-    )
-  }
-
-  // -----------------Code for processing single still image----------------------------------------
-  override fun processBitmap(bitmap: Bitmap?, graphicOverlay: com.good.scanner.GraphicOverlay) {
-    val frameStartMs = SystemClock.elapsedRealtime()
-
-    if (isMlImageEnabled(graphicOverlay.context)) {
-      val mlImage = BitmapMlImageBuilder(bitmap!!).build()
-      requestDetectInImage(
-        mlImage,
-        graphicOverlay,
-        /* originalCameraImage= */ null,
-        /* shouldShowFps= */ false,
-        frameStartMs
-      )
-      mlImage.close()
-      return
+    companion object {
+        const val MANUAL_TESTING_LOG = "LogTagForTest"
+        private const val TAG = "VisionProcessorBase"
     }
 
-    requestDetectInImage(
-      InputImage.fromBitmap(bitmap!!, 0),
-      graphicOverlay,
-      /* originalCameraImage= */ null,
-      /* shouldShowFps= */ false,
-      frameStartMs
-    )
-  }
+    private var activityManager: ActivityManager =
+            context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+    private val fpsTimer = Timer()
+    private val executor = com.good.scanner.ScopedExecutor(TaskExecutors.MAIN_THREAD)
 
-  // -----------------Common processing logic-------------------------------------------------------
-  private fun requestDetectInImage(
-          image: InputImage,
-          graphicOverlay: com.good.scanner.GraphicOverlay,
-          originalCameraImage: Bitmap?,
-          shouldShowFps: Boolean,
-          frameStartMs: Long
-  ): Task<T> {
-    return setUpListener(
-      detectInImage(image),
-      graphicOverlay,
-      originalCameraImage,
-      shouldShowFps,
-      frameStartMs
-    )
-  }
+    // Whether this processor is already shut down
+    private var isShutdown = false
 
-  private fun requestDetectInImage(
-          image: MlImage,
-          graphicOverlay: com.good.scanner.GraphicOverlay,
-          originalCameraImage: Bitmap?,
-          shouldShowFps: Boolean,
-          frameStartMs: Long
-  ): Task<T> {
-    return setUpListener(
-      detectInImage(image),
-      graphicOverlay,
-      originalCameraImage,
-      shouldShowFps,
-      frameStartMs
-    )
-  }
+    // Used to calculate latency, running in the same thread, no sync needed.
+    private var numRuns = 0
+    private var totalFrameMs = 0L
+    private var maxFrameMs = 0L
+    private var minFrameMs = Long.MAX_VALUE
+    private var totalDetectorMs = 0L
+    private var maxDetectorMs = 0L
+    private var minDetectorMs = Long.MAX_VALUE
 
-  private fun setUpListener(
-          task: Task<T>,
-          graphicOverlay: com.good.scanner.GraphicOverlay,
-          originalCameraImage: Bitmap?,
-          shouldShowFps: Boolean,
-          frameStartMs: Long
-  ): Task<T> {
-    val detectorStartMs = SystemClock.elapsedRealtime()
-    return task
-      .addOnSuccessListener(
-        executor,
-        OnSuccessListener { results: T ->
-          val endMs = SystemClock.elapsedRealtime()
-          val currentFrameLatencyMs = endMs - frameStartMs
-          val currentDetectorLatencyMs = endMs - detectorStartMs
-          if (numRuns >= 500) {
-            resetLatencyStats()
-          }
-          numRuns++
-          frameProcessedInOneSecondInterval++
-          totalFrameMs += currentFrameLatencyMs
-          maxFrameMs = max(currentFrameLatencyMs, maxFrameMs)
-          minFrameMs = min(currentFrameLatencyMs, minFrameMs)
-          totalDetectorMs += currentDetectorLatencyMs
-          maxDetectorMs = max(currentDetectorLatencyMs, maxDetectorMs)
-          minDetectorMs = min(currentDetectorLatencyMs, minDetectorMs)
+    // Frame count that have been processed so far in an one second interval to calculate FPS.
+    private var frameProcessedInOneSecondInterval = 0
+    private var framesPerSecond = 0
 
-          // Only log inference info once per second. When frameProcessedInOneSecondInterval is
-          // equal to 1, it means this is the first frame processed during the current second.
-          if (frameProcessedInOneSecondInterval == 1) {
-            Log.d(TAG, "Num of Runs: $numRuns")
-            Log.d(
-              TAG,
-              "Frame latency: max=" +
-                maxFrameMs +
-                ", min=" +
-                minFrameMs +
-                ", avg=" +
-                totalFrameMs / numRuns
+    init {
+        fpsTimer.scheduleAtFixedRate(
+                object : TimerTask() {
+                    override fun run() {
+                        framesPerSecond = frameProcessedInOneSecondInterval
+                        frameProcessedInOneSecondInterval = 0
+                    }
+                },
+                0,
+                1000
+        )
+    }
+
+    // -----------------Code for processing single still image----------------------------------------
+    override fun processBitmap(bitmap: Bitmap?, graphicOverlay: com.good.scanner.GraphicOverlay) {
+        val frameStartMs = SystemClock.elapsedRealtime()
+
+        if (isMlImageEnabled(graphicOverlay.context)) {
+            val mlImage = BitmapMlImageBuilder(bitmap!!).build()
+            requestDetectInImage(
+                    mlImage,
+                    graphicOverlay,
+                    /* originalCameraImage= */ null,
+                    /* shouldShowFps= */ false,
+                    frameStartMs
             )
-            Log.d(
-              TAG,
-              "Detector latency: max=" +
-                maxDetectorMs +
-                ", min=" +
-                minDetectorMs +
-                ", avg=" +
-                totalDetectorMs / numRuns
-            )
-            val mi = ActivityManager.MemoryInfo()
-            activityManager.getMemoryInfo(mi)
-            val availableMegs: Long = mi.availMem / 0x100000L
-            Log.d(TAG, "Memory available in system: $availableMegs MB")
-          }
-          graphicOverlay.clear()
-          if (originalCameraImage != null) {
-            graphicOverlay.add(com.good.scanner.CameraImageGraphic(graphicOverlay, originalCameraImage))
-          }
-          this@VisionProcessorBase.onSuccess(results, graphicOverlay)
-          if (!com.good.scanner.preference.PreferenceUtils.shouldHideDetectionInfo(graphicOverlay.context)) {
-            graphicOverlay.add(
-                    com.good.scanner.InferenceInfoGraphic(
-                            graphicOverlay,
-                            currentFrameLatencyMs,
-                            currentDetectorLatencyMs,
-                            if (shouldShowFps) framesPerSecond else null
-                    )
-            )
-          }
-          graphicOverlay.postInvalidate()
+            mlImage.close()
+            return
         }
-      )
-      .addOnFailureListener(
-        executor,
-        OnFailureListener { e: Exception ->
-          graphicOverlay.clear()
-          graphicOverlay.postInvalidate()
-          val error = "Failed to process. Error: " + e.localizedMessage
-          Toast.makeText(
-              graphicOverlay.context,
-              """
+
+        requestDetectInImage(
+                InputImage.fromBitmap(bitmap!!, 0),
+                graphicOverlay,
+                /* originalCameraImage= */ null,
+                /* shouldShowFps= */ false,
+                frameStartMs
+        )
+    }
+
+    // -----------------Common processing logic-------------------------------------------------------
+    private fun requestDetectInImage(
+            image: InputImage,
+            graphicOverlay: com.good.scanner.GraphicOverlay,
+            originalCameraImage: Bitmap?,
+            shouldShowFps: Boolean,
+            frameStartMs: Long
+    ): Task<T> {
+        return setUpListener(
+                detectInImage(image),
+                graphicOverlay,
+                originalCameraImage,
+                shouldShowFps,
+                frameStartMs
+        )
+    }
+
+    private fun requestDetectInImage(
+            image: MlImage,
+            graphicOverlay: com.good.scanner.GraphicOverlay,
+            originalCameraImage: Bitmap?,
+            shouldShowFps: Boolean,
+            frameStartMs: Long
+    ): Task<T> {
+        return setUpListener(
+                detectInImage(image),
+                graphicOverlay,
+                originalCameraImage,
+                shouldShowFps,
+                frameStartMs
+        )
+    }
+
+    private fun setUpListener(
+            task: Task<T>,
+            graphicOverlay: com.good.scanner.GraphicOverlay,
+            originalCameraImage: Bitmap?,
+            shouldShowFps: Boolean,
+            frameStartMs: Long
+    ): Task<T> {
+        val detectorStartMs = SystemClock.elapsedRealtime()
+        return task
+                .addOnSuccessListener(
+                        executor,
+                        OnSuccessListener { results: T ->
+                            val endMs = SystemClock.elapsedRealtime()
+                            val currentFrameLatencyMs = endMs - frameStartMs
+                            val currentDetectorLatencyMs = endMs - detectorStartMs
+                            if (numRuns >= 500) {
+                                resetLatencyStats()
+                            }
+                            numRuns++
+                            frameProcessedInOneSecondInterval++
+                            totalFrameMs += currentFrameLatencyMs
+                            maxFrameMs = max(currentFrameLatencyMs, maxFrameMs)
+                            minFrameMs = min(currentFrameLatencyMs, minFrameMs)
+                            totalDetectorMs += currentDetectorLatencyMs
+                            maxDetectorMs = max(currentDetectorLatencyMs, maxDetectorMs)
+                            minDetectorMs = min(currentDetectorLatencyMs, minDetectorMs)
+
+                            // Only log inference info once per second. When frameProcessedInOneSecondInterval is
+                            // equal to 1, it means this is the first frame processed during the current second.
+                            if (frameProcessedInOneSecondInterval == 1) {
+                                Log.d(TAG, "Num of Runs: $numRuns")
+                                Log.d(
+                                        TAG,
+                                        "Frame latency: max=" +
+                                                maxFrameMs +
+                                                ", min=" +
+                                                minFrameMs +
+                                                ", avg=" +
+                                                totalFrameMs / numRuns
+                                )
+                                Log.d(
+                                        TAG,
+                                        "Detector latency: max=" +
+                                                maxDetectorMs +
+                                                ", min=" +
+                                                minDetectorMs +
+                                                ", avg=" +
+                                                totalDetectorMs / numRuns
+                                )
+                                val mi = ActivityManager.MemoryInfo()
+                                activityManager.getMemoryInfo(mi)
+                                val availableMegs: Long = mi.availMem / 0x100000L
+                                Log.d(TAG, "Memory available in system: $availableMegs MB")
+                            }
+                            graphicOverlay.clear()
+                            if (originalCameraImage != null) {
+                                graphicOverlay.add(com.good.scanner.CameraImageGraphic(graphicOverlay, originalCameraImage))
+                            }
+                            this@VisionProcessorBase.onSuccess(results, graphicOverlay)
+                            if (!com.good.scanner.preference.PreferenceUtils.shouldHideDetectionInfo(graphicOverlay.context)) {
+                                graphicOverlay.add(
+                                        com.good.scanner.InferenceInfoGraphic(
+                                                graphicOverlay,
+                                                currentFrameLatencyMs,
+                                                currentDetectorLatencyMs,
+                                                if (shouldShowFps) framesPerSecond else null
+                                        )
+                                )
+                            }
+                            graphicOverlay.postInvalidate()
+                        }
+                )
+                .addOnFailureListener(
+                        executor,
+                        OnFailureListener { e: Exception ->
+                            graphicOverlay.clear()
+                            graphicOverlay.postInvalidate()
+                            val error = "Failed to process. Error: " + e.localizedMessage
+                            Toast.makeText(
+                                    graphicOverlay.context,
+                                    """
           $error
           Cause: ${e.cause}
           """.trimIndent(),
-              Toast.LENGTH_SHORT
-            )
-            .show()
-          Log.d(TAG, error)
-          e.printStackTrace()
-          this@VisionProcessorBase.onFailure(e)
-        }
-      )
-  }
+                                    Toast.LENGTH_SHORT
+                            )
+                                    .show()
+                            Log.d(TAG, error)
+                            e.printStackTrace()
+                            this@VisionProcessorBase.onFailure(e)
+                        }
+                )
+    }
 
-  override fun stop() {
-    executor.shutdown()
-    isShutdown = true
-    resetLatencyStats()
-    fpsTimer.cancel()
-  }
+    override fun stop() {
+        executor.shutdown()
+        isShutdown = true
+        resetLatencyStats()
+        fpsTimer.cancel()
+    }
 
-  private fun resetLatencyStats() {
-    numRuns = 0
-    totalFrameMs = 0
-    maxFrameMs = 0
-    minFrameMs = Long.MAX_VALUE
-    totalDetectorMs = 0
-    maxDetectorMs = 0
-    minDetectorMs = Long.MAX_VALUE
-  }
+    private fun resetLatencyStats() {
+        numRuns = 0
+        totalFrameMs = 0
+        maxFrameMs = 0
+        minFrameMs = Long.MAX_VALUE
+        totalDetectorMs = 0
+        maxDetectorMs = 0
+        minDetectorMs = Long.MAX_VALUE
+    }
 
-  protected abstract fun detectInImage(image: InputImage): Task<T>
+    protected abstract fun detectInImage(image: InputImage): Task<T>
 
-  protected open fun detectInImage(image: MlImage): Task<T> {
-    return Tasks.forException(
-      MlKitException(
-        "MlImage is currently not demonstrated for this feature",
-        MlKitException.INVALID_ARGUMENT
-      )
-    )
-  }
+    protected open fun detectInImage(image: MlImage): Task<T> {
+        return Tasks.forException(
+                MlKitException(
+                        "MlImage is currently not demonstrated for this feature",
+                        MlKitException.INVALID_ARGUMENT
+                )
+        )
+    }
 
-  protected abstract fun onSuccess(results: T, graphicOverlay: com.good.scanner.GraphicOverlay)
+    protected abstract fun onSuccess(results: T, graphicOverlay: com.good.scanner.GraphicOverlay)
 
-  protected abstract fun onFailure(e: Exception)
+    protected abstract fun onFailure(e: Exception)
 
-  protected open fun isMlImageEnabled(context: Context?): Boolean {
-    return false
-  }
+    protected open fun isMlImageEnabled(context: Context?): Boolean {
+        return false
+    }
 }

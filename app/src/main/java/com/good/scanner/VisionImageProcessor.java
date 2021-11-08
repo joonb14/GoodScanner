@@ -18,12 +18,18 @@ package com.good.scanner;
 
 import android.graphics.Bitmap;
 
-/** An interface to process the images with different vision detectors and custom image models. */
+/**
+ * An interface to process the images with different vision detectors and custom image models.
+ */
 public interface VisionImageProcessor {
 
-  /** Processes a bitmap image. */
-  void processBitmap(Bitmap bitmap, GraphicOverlay graphicOverlay);
+    /**
+     * Processes a bitmap image.
+     */
+    void processBitmap(Bitmap bitmap, GraphicOverlay graphicOverlay);
 
-  /** Stops the underlying machine learning model and release resources. */
-  void stop();
+    /**
+     * Stops the underlying machine learning model and release resources.
+     */
+    void stop();
 }
