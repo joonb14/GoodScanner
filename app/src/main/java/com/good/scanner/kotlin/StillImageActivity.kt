@@ -23,27 +23,28 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.os.Debug
 import android.provider.MediaStore
-import androidx.appcompat.app.AppCompatActivity
 import android.util.Log
 import android.util.Pair
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewTreeObserver
-import android.widget.AdapterView
+import android.widget.*
 import android.widget.AdapterView.OnItemSelectedListener
-import android.widget.ArrayAdapter
-import android.widget.ImageView
-import android.widget.PopupMenu
-import android.widget.Spinner
-import android.widget.Toast
-import com.google.android.gms.common.annotation.KeepName
-import com.google.mlkit.vision.demo.R
+import androidx.appcompat.app.AppCompatActivity
 import com.good.scanner.kotlin.textdetector.TextRecognitionProcessor
 import com.good.scanner.preference.SettingsActivity.LaunchSource
+import com.google.android.gms.common.annotation.KeepName
+import com.google.mlkit.vision.demo.R
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
+import org.opencv.android.OpenCVLoader
+import org.opencv.android.Utils
+import org.opencv.core.*
+import org.opencv.core.Core.compare
+import org.opencv.imgproc.Imgproc
 import java.io.IOException
-import java.util.ArrayList
+import java.util.*
 
 /** Activity demonstrating different image detector features with a still image from camera.  */
 @KeepName
@@ -64,6 +65,7 @@ class StillImageActivity : AppCompatActivity() {
     private var imageProcessor: com.good.scanner.VisionImageProcessor? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContentView(R.layout.activity_still_image)
         findViewById<View>(R.id.select_image_button)
                 .setOnClickListener { view: View ->
@@ -318,23 +320,43 @@ class StillImageActivity : AppCompatActivity() {
                 )
             }
 
-            // TODO : Image preprocessing - Edge Detection
-            // resizedBitmap 을 이용하여 Edge Detection 한 결과를 edgeDetectedBitmap 에 저장
-            val edgeDetectedBitmap: Bitmap
-
-            // TODO : Image preprocessing - Perspective Transform
-            // edgeDetectedBitmap 을 이용하여 Perspective Transform 한 결과를 transformedBitmap 에 저장
-            val transformedBitmap: Bitmap
+            val imageMat = Mat()
+            Utils.bitmapToMat(resizedBitmap, imageMat)
+            // TODO : Image preprocessing - Input Image to Greyscale Image
+            // image 를 B&W image 로 변환한 결과를 greyMat 에 저장
+            val greyMat = Mat(imageMat.size(), CvType.CV_8UC1) // for GreyScale Bitmap (CV_8UC1)
+            Imgproc.cvtColor(imageMat, greyMat, Imgproc.COLOR_RGB2GRAY, 4)
 
             // TODO : Image preprocessing - Gaussian Blur
-            // transformedBitmap 을 이용하여 Gaussian Blur 한 결과를 blurredBitmap 에 저장
-            val blurredBitmap: Bitmap
+            // Gaussian Blur 한 결과를 blurredMat 에 저장
+            val blurredMat = Mat(imageMat.size(), CvType.CV_8UC1)
+            val ksize = Size(5.0, 5.0)
+            Imgproc.GaussianBlur(greyMat, blurredMat, ksize, 0.0)
+
+            // TODO : Image preprocessing - Edge Detection
+            // Canny 를 이용하여 Edge Detection 한 결과를 edgesMat 에 저장
+            val edgesMat = Mat(imageMat.size(), CvType.CV_8UC1)
+            Imgproc.Canny(blurredMat, edgesMat, 80.0, 100.0)
+            // edges Mat 를 이용하여 Edge Detection 한 결과를 edgeDetectedBitmap 에 저장
+            val edgeDetectedBitmap = Bitmap.createBitmap(edgesMat.cols(), edgesMat.rows(), Bitmap.Config.ARGB_8888) // for RGBA Bitmap (ARGB_8888)
+            Utils.matToBitmap(edgesMat, edgeDetectedBitmap)
+
+            // TODO : Image preprocessing - Find Contour
+            val contours = findContours(edgesMat)
+            if (contours != null) {
+                for (contour in contours){
+                    Log.d(TAG, "Contour: "+contour.toString())
+                }
+            }
+
+            // TODO : Image preprocessing - Perspective Transform
 
             // TODO : Image preprocessing - Thresholding (Result image should be black & white)
-            // blurredBitmap 을 이용하여 Threshold 를 이용하여 B&W image 로 변환한 결과를 thresholdBitmap 에 저장
-            val thresholdBitmap: Bitmap
 
-            preview!!.setImageBitmap(resizedBitmap)
+            // for debugging (release 땐 아래의 for release 로!)
+            preview!!.setImageBitmap(edgeDetectedBitmap)
+            // for release
+            // preview!!.setImageBitmap(resizedBitmap)
             if (imageProcessor != null) {
                 graphicOverlay!!.setImageSourceInfo(
                         resizedBitmap.width, resizedBitmap.height, /* isFlipped= */false
@@ -403,6 +425,27 @@ class StillImageActivity : AppCompatActivity() {
         }
     }
 
+    // TODO : Image preprocessing - Find Contour
+    fun findContours(outmat: Mat): ArrayList<MatOfPoint?>? {
+        val hierarchy = Mat()
+        val contours: List<MatOfPoint> = ArrayList<MatOfPoint>()
+        Imgproc.findContours(outmat, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
+        val maxArea = 100.0
+        var maxAreaIdx = -1
+        val contourArray: ArrayList<MatOfPoint?> = ArrayList<MatOfPoint?>()
+        for (idx in contours.indices) {
+            val contour: MatOfPoint = contours[idx]
+            val contourArea = Imgproc.contourArea(contour)
+            if (contourArea > maxArea) {
+                // maxArea = contourArea;
+                maxAreaIdx = idx
+                contourArray.add(contour)
+                //  Imgproc.drawContours(image, contours, maxAreaIdx, new Scalar(0,0, 255));
+            }
+        }
+        return contourArray
+    }
+
     companion object {
         private const val TAG = "StillImageActivity"
         private const val TEXT_RECOGNITION_KOREAN = "Text Recognition Korean"
@@ -417,5 +460,13 @@ class StillImageActivity : AppCompatActivity() {
         private const val KEY_SELECTED_SIZE = "com.google.mlkit.vision.demo.KEY_SELECTED_SIZE"
         private const val REQUEST_IMAGE_CAPTURE = 1001
         private const val REQUEST_CHOOSE_IMAGE = 1002
+
+        init {
+            if(!OpenCVLoader.initDebug()){
+                Log.d(TAG, "OpenCV is not loaded!")
+            } else {
+                Log.d(TAG, "OpenCV is loaded successfully!")
+            }
+        }
     }
 }
