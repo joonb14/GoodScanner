@@ -318,6 +318,22 @@ class StillImageActivity : AppCompatActivity() {
                 )
             }
 
+            // TODO : Image preprocessing - Edge Detection
+            // resizedBitmap 을 이용하여 Edge Detection 한 결과를 edgeDetectedBitmap 에 저장
+            val edgeDetectedBitmap: Bitmap
+
+            // TODO : Image preprocessing - Perspective Transform
+            // edgeDetectedBitmap 을 이용하여 Perspective Transform 한 결과를 transformedBitmap 에 저장
+            val transformedBitmap: Bitmap
+
+            // TODO : Image preprocessing - Gaussian Blur
+            // transformedBitmap 을 이용하여 Gaussian Blur 한 결과를 blurredBitmap 에 저장
+            val blurredBitmap: Bitmap
+
+            // TODO : Image preprocessing - Thresholding (Result image should be black & white)
+            // blurredBitmap 을 이용하여 Threshold 를 이용하여 B&W image 로 변환한 결과를 thresholdBitmap 에 저장
+            val thresholdBitmap: Bitmap
+
             preview!!.setImageBitmap(resizedBitmap)
             if (imageProcessor != null) {
                 graphicOverlay!!.setImageSourceInfo(
