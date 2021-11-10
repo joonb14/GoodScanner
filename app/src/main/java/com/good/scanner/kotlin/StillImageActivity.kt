@@ -23,7 +23,6 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
-import android.os.Debug
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Pair
@@ -41,7 +40,6 @@ import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.*
-import org.opencv.core.Core.compare
 import org.opencv.imgproc.Imgproc
 import java.io.IOException
 import java.util.*
@@ -339,13 +337,28 @@ class StillImageActivity : AppCompatActivity() {
             Imgproc.Canny(blurredMat, edgesMat, 80.0, 100.0)
             // edges Mat 를 이용하여 Edge Detection 한 결과를 edgeDetectedBitmap 에 저장
             val edgeDetectedBitmap = Bitmap.createBitmap(edgesMat.cols(), edgesMat.rows(), Bitmap.Config.ARGB_8888) // for RGBA Bitmap (ARGB_8888)
-            Utils.matToBitmap(edgesMat, edgeDetectedBitmap)
 
-            // TODO : Image preprocessing - Find Contour
-            val contours = findContours(edgesMat)
+            // TODO : Image preprocessing - Find Contour And Sort
+            // Contour 자체가 선이 이어져 닫힌 도형을 의미하다보니 이미지에 4개의 모서리가 완전히 들어와있지않으면 제대로 인식이 안댐... 특히나 바코드 같은거 때문에 더....
+            // contourArea 계산할때 사이즈가 많이 크면 인식을 못하는건가 싶기도하고....
+            var contours = findContours(edgesMat)
             if (contours != null) {
+                if (contours.size > CONTOUR_NUM) contours = contours.subList(0, CONTOUR_NUM)
                 for (contour in contours){
-                    Log.d(TAG, "Contour: "+contour.toString())
+                    Log.d(TAG, "Contour Area: "+Imgproc.contourArea(contour))
+                    val dst = MatOfPoint2f()
+                    contour?.convertTo(dst, CvType.CV_32F) // MatOfPoint to MatOfPoint2f
+                    val peri = Imgproc.arcLength(dst, true)
+                    val approx = MatOfPoint2f()
+                    Imgproc.approxPolyDP(dst, approx,0.02 * peri, true)
+                    val points = approx.toArray()
+                    if (points.size == 4) {
+                        val temp= MatOfPoint()
+                        approx.convertTo(temp, CvType.CV_32S) // MatOfPoint2f to MatOfPoint
+                        val contourTemp: List<MatOfPoint> = listOf(temp)
+                        Imgproc.drawContours(imageMat,contourTemp,0,  Scalar(0.0, 255.0, 0.0), 2) // draw green contour box
+                        break
+                    }
                 }
             }
 
@@ -353,6 +366,8 @@ class StillImageActivity : AppCompatActivity() {
 
             // TODO : Image preprocessing - Thresholding (Result image should be black & white)
 
+            // Utils.matToBitmap(edgesMat, edgeDetectedBitmap) // edge detection 결과를 보기 위함
+            Utils.matToBitmap(imageMat, edgeDetectedBitmap) // contour detection 결과를 보기 위함
             // for debugging (release 땐 아래의 for release 로!)
             preview!!.setImageBitmap(edgeDetectedBitmap)
             // for release
@@ -426,24 +441,11 @@ class StillImageActivity : AppCompatActivity() {
     }
 
     // TODO : Image preprocessing - Find Contour
-    fun findContours(outmat: Mat): ArrayList<MatOfPoint?>? {
+    private fun findContours(outMat: Mat): List<MatOfPoint?>? {
         val hierarchy = Mat()
         val contours: List<MatOfPoint> = ArrayList<MatOfPoint>()
-        Imgproc.findContours(outmat, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
-        val maxArea = 100.0
-        var maxAreaIdx = -1
-        val contourArray: ArrayList<MatOfPoint?> = ArrayList<MatOfPoint?>()
-        for (idx in contours.indices) {
-            val contour: MatOfPoint = contours[idx]
-            val contourArea = Imgproc.contourArea(contour)
-            if (contourArea > maxArea) {
-                // maxArea = contourArea;
-                maxAreaIdx = idx
-                contourArray.add(contour)
-                //  Imgproc.drawContours(image, contours, maxAreaIdx, new Scalar(0,0, 255));
-            }
-        }
-        return contourArray
+        Imgproc.findContours(outMat, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
+        return contours.sortedWith(compareBy {-Imgproc.contourArea(it)}) // descending sort
     }
 
     companion object {
@@ -460,6 +462,7 @@ class StillImageActivity : AppCompatActivity() {
         private const val KEY_SELECTED_SIZE = "com.google.mlkit.vision.demo.KEY_SELECTED_SIZE"
         private const val REQUEST_IMAGE_CAPTURE = 1001
         private const val REQUEST_CHOOSE_IMAGE = 1002
+        private const val CONTOUR_NUM = 5
 
         init {
             if(!OpenCVLoader.initDebug()){
