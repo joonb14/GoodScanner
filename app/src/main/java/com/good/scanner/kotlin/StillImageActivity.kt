@@ -318,60 +318,26 @@ class StillImageActivity : AppCompatActivity() {
                 )
             }
 
-            val imageMat = Mat()
-            Utils.bitmapToMat(resizedBitmap, imageMat)
-            // TODO : Image preprocessing - Input Image to Greyscale Image
-            // image 를 B&W image 로 변환한 결과를 greyMat 에 저장
-            val greyMat = Mat(imageMat.size(), CvType.CV_8UC1) // for GreyScale Bitmap (CV_8UC1)
-            Imgproc.cvtColor(imageMat, greyMat, Imgproc.COLOR_RGB2GRAY, 4)
-
-            // TODO : Image preprocessing - Gaussian Blur
-            // Gaussian Blur 한 결과를 blurredMat 에 저장
-            val blurredMat = Mat(imageMat.size(), CvType.CV_8UC1)
-            val ksize = Size(5.0, 5.0)
-            Imgproc.GaussianBlur(greyMat, blurredMat, ksize, 0.0)
-
-            // TODO : Image preprocessing - Edge Detection
-            // Canny 를 이용하여 Edge Detection 한 결과를 edgesMat 에 저장
-            val edgesMat = Mat(imageMat.size(), CvType.CV_8UC1)
-            Imgproc.Canny(blurredMat, edgesMat, 80.0, 100.0)
-            // edges Mat 를 이용하여 Edge Detection 한 결과를 edgeDetectedBitmap 에 저장
-            val edgeDetectedBitmap = Bitmap.createBitmap(edgesMat.cols(), edgesMat.rows(), Bitmap.Config.ARGB_8888) // for RGBA Bitmap (ARGB_8888)
-
-            // TODO : Image preprocessing - Find Contour And Sort
-            // Contour 자체가 선이 이어져 닫힌 도형을 의미하다보니 이미지에 4개의 모서리가 완전히 들어와있지않으면 제대로 인식이 안댐... 특히나 바코드 같은거 때문에 더....
-            // contourArea 계산할때 사이즈가 많이 크면 인식을 못하는건가 싶기도하고....
-            var contours = findContours(edgesMat)
-            if (contours != null) {
-                if (contours.size > CONTOUR_NUM) contours = contours.subList(0, CONTOUR_NUM)
-                for (contour in contours){
-                    Log.d(TAG, "Contour Area: "+Imgproc.contourArea(contour))
-                    val dst = MatOfPoint2f()
-                    contour?.convertTo(dst, CvType.CV_32F) // MatOfPoint to MatOfPoint2f
-                    val peri = Imgproc.arcLength(dst, true)
-                    val approx = MatOfPoint2f()
-                    Imgproc.approxPolyDP(dst, approx,0.02 * peri, true)
-                    val points = approx.toArray()
-                    if (points.size == 4) {
-                        val temp= MatOfPoint()
-                        approx.convertTo(temp, CvType.CV_32S) // MatOfPoint2f to MatOfPoint
-                        val contourTemp: List<MatOfPoint> = listOf(temp)
-                        Imgproc.drawContours(imageMat,contourTemp,0,  Scalar(0.0, 255.0, 0.0), 2) // draw green contour box
-                        break
-                    }
-                }
+            val utils = ImgProcUtils()
+            val imageMat = utils.convertBitmapToMat(resizedBitmap)
+            val greyMat = utils.convertToGreyScale(imageMat)
+            val blurredMat = utils.convertToBlurred(greyMat)
+            val edgesMat = utils.convertToEdgeDetected(blurredMat)
+            val contours = utils.findContours(edgesMat)
+            contours.firstOrNull {
+                utils.approximatePolygonal(it).toArray().size == 4
+            }?.let {
+                utils.drawContour(imageMat, it)
             }
 
             // TODO : Image preprocessing - Perspective Transform
 
             // TODO : Image preprocessing - Thresholding (Result image should be black & white)
 
-            // Utils.matToBitmap(edgesMat, edgeDetectedBitmap) // edge detection 결과를 보기 위함
-            Utils.matToBitmap(imageMat, edgeDetectedBitmap) // contour detection 결과를 보기 위함
-            // for debugging (release 땐 아래의 for release 로!)
-            preview!!.setImageBitmap(edgeDetectedBitmap)
-            // for release
-            // preview!!.setImageBitmap(resizedBitmap)
+            val resultBitmap = utils.convertMatToBitmap(imageMat) // 원하는 Mat을 bitmap으로 변환
+            preview!!.setImageBitmap(resultBitmap)
+
+
             if (imageProcessor != null) {
                 graphicOverlay!!.setImageSourceInfo(
                         resizedBitmap.width, resizedBitmap.height, /* isFlipped= */false
@@ -440,14 +406,6 @@ class StillImageActivity : AppCompatActivity() {
         }
     }
 
-    // TODO : Image preprocessing - Find Contour
-    private fun findContours(outMat: Mat): List<MatOfPoint?>? {
-        val hierarchy = Mat()
-        val contours: List<MatOfPoint> = ArrayList<MatOfPoint>()
-        Imgproc.findContours(outMat, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
-        return contours.sortedWith(compareBy {-Imgproc.contourArea(it)}) // descending sort
-    }
-
     companion object {
         private const val TAG = "StillImageActivity"
         private const val TEXT_RECOGNITION_KOREAN = "Text Recognition Korean"
@@ -462,7 +420,6 @@ class StillImageActivity : AppCompatActivity() {
         private const val KEY_SELECTED_SIZE = "com.google.mlkit.vision.demo.KEY_SELECTED_SIZE"
         private const val REQUEST_IMAGE_CAPTURE = 1001
         private const val REQUEST_CHOOSE_IMAGE = 1002
-        private const val CONTOUR_NUM = 5
 
         init {
             if(!OpenCVLoader.initDebug()){
