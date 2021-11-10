@@ -1,4 +1,4 @@
-package com.good.scanner.kotlin
+package com.good.scanner
 
 import android.graphics.Bitmap
 import org.opencv.android.Utils
@@ -13,7 +13,7 @@ class ImgProcUtils {
         }
     }
 
-    fun convertMatOfPoint2fToMatOfPoint(matOfPoint2f: MatOfPoint2f): MatOfPoint {
+    private fun convertMatOfPoint2fToMatOfPoint(matOfPoint2f: MatOfPoint2f): MatOfPoint {
         return MatOfPoint().also {
             matOfPoint2f.convertTo(it, CvType.CV_32S)
         }
@@ -26,7 +26,9 @@ class ImgProcUtils {
     }
 
     fun convertMatToBitmap(mat: Mat): Bitmap {
-        return Bitmap.createBitmap(mat.cols(), mat.rows(), Bitmap.Config.ARGB_8888)
+        return Bitmap.createBitmap(mat.cols(), mat.rows(), Bitmap.Config.ARGB_8888).also {
+            Utils.matToBitmap(mat, it)
+        }
     }
 
     fun convertToGreyScale(beforeMat: Mat): Mat {
