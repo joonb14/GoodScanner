@@ -1,6 +1,8 @@
 package com.good.scanner
 
 import android.graphics.Bitmap
+import android.util.Log
+import com.good.scanner.kotlin.StillImageActivity
 import org.opencv.android.Utils
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
@@ -32,7 +34,7 @@ class ImgProcUtils {
     }
 
     fun convertToGreyScale(beforeMat: Mat): Mat {
-        // TODO : Image preprocessing - Input Image to Greyscale Image
+        // TODO: Image preprocessing - Input Image to Greyscale Image
         // image 를 B&W image 로 변환한 결과를 greyMat 에 저장
         return Mat(beforeMat.size(), CvType.CV_8UC1).also {
             Imgproc.cvtColor(beforeMat, it, Imgproc.COLOR_RGB2GRAY, 4)
@@ -40,7 +42,7 @@ class ImgProcUtils {
     }
 
     fun convertToBlurred(beforeMat: Mat): Mat {
-        // TODO : Image preprocessing - Gaussian Blur
+        // TODO: Image preprocessing - Gaussian Blur
         // Gaussian Blur 한 결과를 blurredMat 에 저장
         return Mat(beforeMat.size(), CvType.CV_8UC1).also {
             Imgproc.GaussianBlur(beforeMat, it, Size(5.0, 5.0), 0.0)
@@ -48,15 +50,15 @@ class ImgProcUtils {
     }
 
     fun convertToEdgeDetected(beforeMat: Mat): Mat {
-        // TODO : Image preprocessing - Edge Detection
+        // TODO: Image preprocessing - Edge Detection
         // Canny 를 이용하여 Edge Detection 한 결과를 edgesMat 에 저장
         return Mat(beforeMat.size(), CvType.CV_8UC1).also {
-            Imgproc.Canny(beforeMat, it, 80.0, 100.0)
+            Imgproc.Canny(beforeMat, it, 75.0, 200.0)
         }
     }
 
     fun findContours(mat: Mat): List<MatOfPoint2f> {
-        // TODO : Image preprocessing - Find Contour
+        // TODO: Image preprocessing - Find Contour
         return ArrayList<MatOfPoint>().also {
             Imgproc.findContours(mat, it, Mat(), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
         }.sortedWith(
@@ -72,15 +74,25 @@ class ImgProcUtils {
         }
     }
 
-    fun drawContour(mat: Mat, contour: MatOfPoint2f) {
-        // TODO : Image preprocessing - Find Contour And Sort
+    fun drawContour(mat: Mat, contour: MatOfPoint2f, scaleX : Float, scaleY : Float) {
+        // TODO: Image preprocessing - Find Contour And Sort
         // Contour 자체가 선이 이어져 닫힌 도형을 의미하다보니 이미지에 4개의 모서리가 완전히 들어와있지않으면 제대로 인식이 안댐... 특히나 바코드 같은거 때문에 더....
         // contourArea 계산할때 사이즈가 많이 크면 인식을 못하는건가 싶기도하고....
-        Imgproc.drawContours(mat, listOf(convertMatOfPoint2fToMatOfPoint(contour)),0,
-                Scalar(0.0, 255.0, 0.0), 2) // draw green contour box
+        val contourList = contour.toList()
+        Log.d(TAG, "Contours rescaling")
+        for (i in contourList.indices) { // 작게 rescale한 image를 이용하여 contour를 찾았기 때문에 contour size를 원본이미지에 맞게 rescaling한다
+            contourList[i].x = contourList[i].x * scaleX
+            contourList[i].y = contourList[i].y * scaleY
+            Log.d(TAG,"x:"+contourList[i].x+", y:"+contourList[i].y)
+        }
+        val scaledContour = MatOfPoint2f()
+        scaledContour.fromList(contourList)
+        Imgproc.drawContours(mat, listOf(convertMatOfPoint2fToMatOfPoint(scaledContour)),-1,
+                Scalar(0.0, 255.0, 0.0), 4) // draw green contour box
     }
 
     companion object {
         private const val CONTOUR_NUM = 5
+        private const val TAG = "ImgProcUtils"
     }
 }

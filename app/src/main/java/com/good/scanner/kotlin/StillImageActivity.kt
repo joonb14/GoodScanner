@@ -23,6 +23,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.os.Debug
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Pair
@@ -283,20 +284,39 @@ class StillImageActivity : AppCompatActivity() {
             graphicOverlay!!.clear() // Clear the overlay first
             val resizedBitmap = getResizedBitmap(imageBitmap)
 
+            // TODO:
+            //  image = imutils.resize(image, height = 500)
+            //  coef_y = orig.shape[0] / image.shape[0]
+            //  coef_x = orig.shape[1] / image.shape[1]
+            //  screenCnt[:, :, 0] = screenCnt[:, :, 0] * coef_x
+            //  screenCnt[:, :, 1] = screenCnt[:, :,  1] * coef_y
+
+            val scaleFactor = (resizedBitmap.height.toFloat() / 500.0) // Height가 500이 되도록 image를 rescaling. edge detection에는 낮은 해상도의 이미지가 더 제격이다
+            val scaledBitmap = Bitmap.createScaledBitmap(
+                resizedBitmap,
+                (resizedBitmap.width / scaleFactor).toInt(),
+                (resizedBitmap.height / scaleFactor).toInt(),
+                true
+            )
+            val scaleY = resizedBitmap.height.toFloat() / scaledBitmap.height.toFloat()
+            val scaleX = resizedBitmap.width.toFloat() / scaledBitmap.width.toFloat()
+
             val utils = ImgProcUtils()
             val imageMat = utils.convertBitmapToMat(resizedBitmap)
-            val greyMat = utils.convertToGreyScale(imageMat)
+            val scaledImageMat = utils.convertBitmapToMat(scaledBitmap)
+            val greyMat = utils.convertToGreyScale(scaledImageMat)
             val blurredMat = utils.convertToBlurred(greyMat)
             val edgesMat = utils.convertToEdgeDetected(blurredMat)
             val contours = utils.findContours(edgesMat)
             contours.firstOrNull {
                 utils.approximatePolygonal(it).toArray().size == 4
             }?.let {
-                utils.drawContour(imageMat, it)
+                Log.d(TAG,"Contour Found!")
+                utils.drawContour(imageMat, it, scaleX, scaleY)
             }
 
-            // TODO : Image preprocessing - Perspective Transform
-            // TODO : Image preprocessing - Thresholding (Result image should be black & white)
+            // TODO: Image preprocessing - Perspective Transform
+            // TODO: Image preprocessing - Thresholding (Result image should be black & white)
 
             val resultBitmap = utils.convertMatToBitmap(imageMat) // 원하는 Mat을 bitmap으로 변환
             preview!!.setImageBitmap(resultBitmap)
