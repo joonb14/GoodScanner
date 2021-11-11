@@ -32,15 +32,14 @@ import android.view.ViewTreeObserver
 import android.widget.*
 import android.widget.AdapterView.OnItemSelectedListener
 import androidx.appcompat.app.AppCompatActivity
+import com.good.scanner.BitmapUtils.getBitmapFromContentUri
+import com.good.scanner.ImgProcUtils
 import com.good.scanner.kotlin.textdetector.TextRecognitionProcessor
 import com.good.scanner.preference.SettingsActivity.LaunchSource
 import com.google.android.gms.common.annotation.KeepName
 import com.google.mlkit.vision.demo.R
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import org.opencv.android.OpenCVLoader
-import org.opencv.android.Utils
-import org.opencv.core.*
-import org.opencv.imgproc.Imgproc
 import java.io.IOException
 import java.util.*
 
@@ -217,22 +216,10 @@ class StillImageActivity : AppCompatActivity() {
 
     public override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putParcelable(
-                com.good.scanner.kotlin.StillImageActivity.Companion.KEY_IMAGE_URI,
-                imageUri
-        )
-        outState.putInt(
-                com.good.scanner.kotlin.StillImageActivity.Companion.KEY_IMAGE_MAX_WIDTH,
-                imageMaxWidth
-        )
-        outState.putInt(
-                com.good.scanner.kotlin.StillImageActivity.Companion.KEY_IMAGE_MAX_HEIGHT,
-                imageMaxHeight
-        )
-        outState.putString(
-                com.good.scanner.kotlin.StillImageActivity.Companion.KEY_SELECTED_SIZE,
-                selectedSize
-        )
+        outState.putParcelable(KEY_IMAGE_URI, imageUri)
+        outState.putInt(KEY_IMAGE_MAX_WIDTH, imageMaxWidth)
+        outState.putInt(KEY_IMAGE_MAX_HEIGHT, imageMaxHeight)
+        outState.putString(KEY_SELECTED_SIZE, selectedSize)
     }
 
     private fun startCameraIntentForResult() { // Clean up last time's image
@@ -245,10 +232,7 @@ class StillImageActivity : AppCompatActivity() {
             values.put(MediaStore.Images.Media.DESCRIPTION, "From Camera")
             imageUri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
             takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri)
-            startActivityForResult(
-                    takePictureIntent,
-                    com.good.scanner.kotlin.StillImageActivity.Companion.REQUEST_IMAGE_CAPTURE
-            )
+            startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE)
         }
     }
 
@@ -256,10 +240,7 @@ class StillImageActivity : AppCompatActivity() {
         val intent = Intent()
         intent.type = "image/*"
         intent.action = Intent.ACTION_GET_CONTENT
-        startActivityForResult(
-                Intent.createChooser(intent, "Select Picture"),
-                com.good.scanner.kotlin.StillImageActivity.Companion.REQUEST_CHOOSE_IMAGE
-        )
+        startActivityForResult(Intent.createChooser(intent, "Select Picture"), REQUEST_CHOOSE_IMAGE)
     }
 
     override fun onActivityResult(
@@ -267,9 +248,9 @@ class StillImageActivity : AppCompatActivity() {
             resultCode: Int,
             data: Intent?
     ) {
-        if (requestCode == com.good.scanner.kotlin.StillImageActivity.Companion.REQUEST_IMAGE_CAPTURE && resultCode == Activity.RESULT_OK) {
+        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == Activity.RESULT_OK) {
             tryReloadAndDetectInImage()
-        } else if (requestCode == com.good.scanner.kotlin.StillImageActivity.Companion.REQUEST_CHOOSE_IMAGE && resultCode == Activity.RESULT_OK) {
+        } else if (requestCode == REQUEST_CHOOSE_IMAGE && resultCode == Activity.RESULT_OK) {
             // In this case, imageUri is returned by the chooser, save it.
             imageUri = data!!.data
             tryReloadAndDetectInImage()
@@ -278,116 +259,57 @@ class StillImageActivity : AppCompatActivity() {
         }
     }
 
+    private fun getResizedBitmap(bitmap: Bitmap): Bitmap {
+        val scaleFactor = (bitmap.width.toFloat() / targetedWidthHeight.first.toFloat())
+                .coerceAtLeast(bitmap.height.toFloat() / targetedWidthHeight.second.toFloat())
+        return when(selectedSize == SIZE_ORIGINAL) {
+            true -> bitmap
+            false -> Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width / scaleFactor).toInt(),
+                (bitmap.height / scaleFactor).toInt(),
+                true
+            )
+        }
+    }
+
     private fun tryReloadAndDetectInImage() {
-        Log.d(
-                com.good.scanner.kotlin.StillImageActivity.Companion.TAG,
-                "Try reload and detect image"
-        )
+        Log.d(TAG, "Try reload and detect image")
         try {
-            if (imageUri == null) {
-                return
-            }
+            if (imageUri == null) return
+            if (SIZE_SCREEN == selectedSize && imageMaxWidth == 0) return // UI layout has not finished yet, will reload once it's ready.
 
-            if (com.good.scanner.kotlin.StillImageActivity.Companion.SIZE_SCREEN == selectedSize && imageMaxWidth == 0) {
-                // UI layout has not finished yet, will reload once it's ready.
-                return
-            }
+            val imageBitmap = getBitmapFromContentUri(contentResolver, imageUri) ?: return
+            graphicOverlay!!.clear() // Clear the overlay first
+            val resizedBitmap = getResizedBitmap(imageBitmap)
 
-            val imageBitmap = com.good.scanner.BitmapUtils.getBitmapFromContentUri(contentResolver, imageUri)
-                    ?: return
-            // Clear the overlay first
-            graphicOverlay!!.clear()
-
-            val resizedBitmap: Bitmap
-            resizedBitmap = if (selectedSize == com.good.scanner.kotlin.StillImageActivity.Companion.SIZE_ORIGINAL) {
-                imageBitmap
-            } else {
-                // Get the dimensions of the image view
-                val targetedSize: Pair<Int, Int> = targetedWidthHeight
-
-                // Determine how much to scale down the image
-                val scaleFactor = Math.max(
-                        imageBitmap.width.toFloat() / targetedSize.first.toFloat(),
-                        imageBitmap.height.toFloat() / targetedSize.second.toFloat()
-                )
-                Bitmap.createScaledBitmap(
-                        imageBitmap,
-                        (imageBitmap.width / scaleFactor).toInt(),
-                        (imageBitmap.height / scaleFactor).toInt(),
-                        true
-                )
-            }
-
-            val imageMat = Mat()
-            Utils.bitmapToMat(resizedBitmap, imageMat)
-            // TODO : Image preprocessing - Input Image to Greyscale Image
-            // image 를 B&W image 로 변환한 결과를 greyMat 에 저장
-            val greyMat = Mat(imageMat.size(), CvType.CV_8UC1) // for GreyScale Bitmap (CV_8UC1)
-            Imgproc.cvtColor(imageMat, greyMat, Imgproc.COLOR_RGB2GRAY, 4)
-
-            // TODO : Image preprocessing - Gaussian Blur
-            // Gaussian Blur 한 결과를 blurredMat 에 저장
-            val blurredMat = Mat(imageMat.size(), CvType.CV_8UC1)
-            val ksize = Size(5.0, 5.0)
-            Imgproc.GaussianBlur(greyMat, blurredMat, ksize, 0.0)
-
-            // TODO : Image preprocessing - Edge Detection
-            // Canny 를 이용하여 Edge Detection 한 결과를 edgesMat 에 저장
-            val edgesMat = Mat(imageMat.size(), CvType.CV_8UC1)
-            Imgproc.Canny(blurredMat, edgesMat, 80.0, 100.0)
-            // edges Mat 를 이용하여 Edge Detection 한 결과를 edgeDetectedBitmap 에 저장
-            val edgeDetectedBitmap = Bitmap.createBitmap(edgesMat.cols(), edgesMat.rows(), Bitmap.Config.ARGB_8888) // for RGBA Bitmap (ARGB_8888)
-
-            // TODO : Image preprocessing - Find Contour And Sort
-            // Contour 자체가 선이 이어져 닫힌 도형을 의미하다보니 이미지에 4개의 모서리가 완전히 들어와있지않으면 제대로 인식이 안댐... 특히나 바코드 같은거 때문에 더....
-            // contourArea 계산할때 사이즈가 많이 크면 인식을 못하는건가 싶기도하고....
-            var contours = findContours(edgesMat)
-            if (contours != null) {
-                if (contours.size > CONTOUR_NUM) contours = contours.subList(0, CONTOUR_NUM)
-                for (contour in contours){
-                    Log.d(TAG, "Contour Area: "+Imgproc.contourArea(contour))
-                    val dst = MatOfPoint2f()
-                    contour?.convertTo(dst, CvType.CV_32F) // MatOfPoint to MatOfPoint2f
-                    val peri = Imgproc.arcLength(dst, true)
-                    val approx = MatOfPoint2f()
-                    Imgproc.approxPolyDP(dst, approx,0.02 * peri, true)
-                    val points = approx.toArray()
-                    if (points.size == 4) {
-                        val temp= MatOfPoint()
-                        approx.convertTo(temp, CvType.CV_32S) // MatOfPoint2f to MatOfPoint
-                        val contourTemp: List<MatOfPoint> = listOf(temp)
-                        Imgproc.drawContours(imageMat,contourTemp,0,  Scalar(0.0, 255.0, 0.0), 2) // draw green contour box
-                        break
-                    }
-                }
+            val utils = ImgProcUtils()
+            val imageMat = utils.convertBitmapToMat(resizedBitmap)
+            val greyMat = utils.convertToGreyScale(imageMat)
+            val blurredMat = utils.convertToBlurred(greyMat)
+            val edgesMat = utils.convertToEdgeDetected(blurredMat)
+            val contours = utils.findContours(edgesMat)
+            contours.firstOrNull {
+                utils.approximatePolygonal(it).toArray().size == 4
+            }?.let {
+                utils.drawContour(imageMat, it)
             }
 
             // TODO : Image preprocessing - Perspective Transform
-
             // TODO : Image preprocessing - Thresholding (Result image should be black & white)
 
-            // Utils.matToBitmap(edgesMat, edgeDetectedBitmap) // edge detection 결과를 보기 위함
-            Utils.matToBitmap(imageMat, edgeDetectedBitmap) // contour detection 결과를 보기 위함
-            // for debugging (release 땐 아래의 for release 로!)
-            preview!!.setImageBitmap(edgeDetectedBitmap)
-            // for release
-            // preview!!.setImageBitmap(resizedBitmap)
+            val resultBitmap = utils.convertMatToBitmap(imageMat) // 원하는 Mat을 bitmap으로 변환
+            preview!!.setImageBitmap(resultBitmap)
+
+
             if (imageProcessor != null) {
-                graphicOverlay!!.setImageSourceInfo(
-                        resizedBitmap.width, resizedBitmap.height, /* isFlipped= */false
-                )
+                graphicOverlay!!.setImageSourceInfo(resizedBitmap.width, resizedBitmap.height, false)
                 imageProcessor!!.processBitmap(resizedBitmap, graphicOverlay)
             } else {
-                Log.e(
-                        com.good.scanner.kotlin.StillImageActivity.Companion.TAG,
-                        "Null imageProcessor, please check adb logs for imageProcessor creation error"
-                )
+                Log.e(TAG, "Null imageProcessor, please check adb logs for imageProcessor creation error")
             }
         } catch (e: IOException) {
-            Log.e(
-                    com.good.scanner.kotlin.StillImageActivity.Companion.TAG,
-                    "Error retrieving saved image"
-            )
+            Log.e(TAG, "Error retrieving saved image")
             imageUri = null
         }
     }
@@ -397,15 +319,15 @@ class StillImageActivity : AppCompatActivity() {
             val targetWidth: Int
             val targetHeight: Int
             when (selectedSize) {
-                com.good.scanner.kotlin.StillImageActivity.Companion.SIZE_SCREEN -> {
+                SIZE_SCREEN -> {
                     targetWidth = imageMaxWidth
                     targetHeight = imageMaxHeight
                 }
-                com.good.scanner.kotlin.StillImageActivity.Companion.SIZE_640_480 -> {
+                SIZE_640_480 -> {
                     targetWidth = if (isLandScape) 640 else 480
                     targetHeight = if (isLandScape) 480 else 640
                 }
-                com.good.scanner.kotlin.StillImageActivity.Companion.SIZE_1024_768 -> {
+                SIZE_1024_768 -> {
                     targetWidth = if (isLandScape) 1024 else 768
                     targetHeight = if (isLandScape) 768 else 1024
                 }
@@ -417,20 +339,13 @@ class StillImageActivity : AppCompatActivity() {
     private fun createImageProcessor() {
         try {
             when (selectedMode) {
-                com.good.scanner.kotlin.StillImageActivity.Companion.TEXT_RECOGNITION_KOREAN ->
+                TEXT_RECOGNITION_KOREAN ->
                     imageProcessor =
                             TextRecognitionProcessor(this, KoreanTextRecognizerOptions.Builder().build())
-                else -> Log.e(
-                        com.good.scanner.kotlin.StillImageActivity.Companion.TAG,
-                        "Unknown selectedMode: $selectedMode"
-                )
+                else -> Log.e(TAG, "Unknown selectedMode: $selectedMode")
             }
         } catch (e: Exception) {
-            Log.e(
-                    com.good.scanner.kotlin.StillImageActivity.Companion.TAG,
-                    "Can not create image processor: $selectedMode",
-                    e
-            )
+            Log.e(TAG, "Can not create image processor: $selectedMode", e)
             Toast.makeText(
                     applicationContext,
                     "Can not create image processor: " + e.message,
@@ -438,14 +353,6 @@ class StillImageActivity : AppCompatActivity() {
             )
                     .show()
         }
-    }
-
-    // TODO : Image preprocessing - Find Contour
-    private fun findContours(outMat: Mat): List<MatOfPoint?>? {
-        val hierarchy = Mat()
-        val contours: List<MatOfPoint> = ArrayList<MatOfPoint>()
-        Imgproc.findContours(outMat, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
-        return contours.sortedWith(compareBy {-Imgproc.contourArea(it)}) // descending sort
     }
 
     companion object {
@@ -462,10 +369,9 @@ class StillImageActivity : AppCompatActivity() {
         private const val KEY_SELECTED_SIZE = "com.google.mlkit.vision.demo.KEY_SELECTED_SIZE"
         private const val REQUEST_IMAGE_CAPTURE = 1001
         private const val REQUEST_CHOOSE_IMAGE = 1002
-        private const val CONTOUR_NUM = 5
 
         init {
-            if(!OpenCVLoader.initDebug()){
+            if (!OpenCVLoader.initDebug()) {
                 Log.d(TAG, "OpenCV is not loaded!")
             } else {
                 Log.d(TAG, "OpenCV is loaded successfully!")
