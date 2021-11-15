@@ -11,6 +11,7 @@
     <string name="start_over" translatable="false">Start over</string>
     <string name="menu_item_settings" translatable="false">Settings</string>
     <string name="select_image" translatable="false">Select image</string>
+    <string name="crop_image" translatable="false">Crop image</string>
     <string name="custom_object_detection" translatable="false">Custom Object Detector</string>
 
     <!-- Settings related strings. -->

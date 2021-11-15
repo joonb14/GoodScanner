@@ -21,9 +21,9 @@ import android.content.ContentValues
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.net.Uri
 import android.os.Bundle
-import android.os.Debug
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Pair
@@ -41,13 +41,21 @@ import com.google.android.gms.common.annotation.KeepName
 import com.google.mlkit.vision.demo.R
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import org.opencv.android.OpenCVLoader
+import org.opencv.android.Utils
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.Point
+import org.opencv.core.Size
+import org.opencv.imgproc.Imgproc
 import java.io.IOException
 import java.util.*
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 /** Activity demonstrating different image detector features with a still image from camera.  */
 @KeepName
 class StillImageActivity : AppCompatActivity() {
-    private var preview: ImageView? = null
+    private var preview: QuadrilateralSelectionImageView? = null
     private var graphicOverlay: com.good.scanner.GraphicOverlay? = null
     private var selectedMode = TEXT_RECOGNITION_KOREAN
     private var selectedSize: String? =
@@ -86,7 +94,7 @@ class StillImageActivity : AppCompatActivity() {
                     inflater.inflate(R.menu.camera_button_menu, popup.menu)
                     popup.show()
                 }
-        preview = findViewById(R.id.preview)
+        preview = findViewById<QuadrilateralSelectionImageView>(R.id.preview)
         graphicOverlay = findViewById(R.id.graphic_overlay)
 
         populateFeatureSelector()
@@ -298,6 +306,8 @@ class StillImageActivity : AppCompatActivity() {
                 (resizedBitmap.height / scaleFactor).toInt(),
                 true
             )
+            preview!!.setImageBitmap(resizedBitmap)
+
             val scaleY = resizedBitmap.height.toFloat() / scaledBitmap.height.toFloat()
             val scaleX = resizedBitmap.width.toFloat() / scaledBitmap.width.toFloat()
 
@@ -308,26 +318,32 @@ class StillImageActivity : AppCompatActivity() {
             val blurredMat = utils.convertToBlurred(greyMat)
             val edgesMat = utils.convertToEdgeDetected(blurredMat)
             val contours = utils.findContours(edgesMat)
+
             contours.firstOrNull {
                 utils.approximatePolygonal(it).toArray().size == 4
             }?.let {
                 Log.d(TAG,"Contour Found!")
-                utils.drawContour(imageMat, it, scaleX, scaleY)
+                val scaledContour = utils.scaleContour(imageMat, it, scaleX, scaleY)
+                val result = ArrayList<PointF>()
+                val points = sortPoints(scaledContour.toArray())
+                result.add(PointF(java.lang.Double.valueOf(points[0].x).toFloat(), java.lang.Double.valueOf(points[0].y).toFloat()))
+                result.add(PointF(java.lang.Double.valueOf(points[1].x).toFloat(), java.lang.Double.valueOf(points[1].y).toFloat()))
+                result.add(PointF(java.lang.Double.valueOf(points[2].x).toFloat(), java.lang.Double.valueOf(points[2].y).toFloat()))
+                result.add(PointF(java.lang.Double.valueOf(points[3].x).toFloat(), java.lang.Double.valueOf(points[3].y).toFloat()))
+                preview?.setPoints(result)
+                // TODO: Image preprocessing - Perspective Transform
+                // TODO: Image preprocessing - Thresholding (Result image should be black & white)
+
+                if (imageProcessor != null) {
+                    graphicOverlay!!.setImageSourceInfo(resizedBitmap.width, resizedBitmap.height, false)
+                    imageProcessor!!.processBitmap(resizedBitmap, graphicOverlay)
+                } else {
+                    Log.e(TAG, "Null imageProcessor, please check adb logs for imageProcessor creation error")
+                }
+            } ?: {
+                preview?.setPoints(null)
             }
 
-            // TODO: Image preprocessing - Perspective Transform
-            // TODO: Image preprocessing - Thresholding (Result image should be black & white)
-
-            val resultBitmap = utils.convertMatToBitmap(imageMat) // 원하는 Mat을 bitmap으로 변환
-            preview!!.setImageBitmap(resultBitmap)
-
-
-            if (imageProcessor != null) {
-                graphicOverlay!!.setImageSourceInfo(resizedBitmap.width, resizedBitmap.height, false)
-                imageProcessor!!.processBitmap(resizedBitmap, graphicOverlay)
-            } else {
-                Log.e(TAG, "Null imageProcessor, please check adb logs for imageProcessor creation error")
-            }
         } catch (e: IOException) {
             Log.e(TAG, "Error retrieving saved image")
             imageUri = null
@@ -373,6 +389,104 @@ class StillImageActivity : AppCompatActivity() {
             )
                     .show()
         }
+    }
+
+    /**
+     * Transform the coordinates on the given Mat to correct the perspective.
+     *
+     * @param src A valid Mat
+     * @param points A list of coordinates from the given Mat to adjust the perspective
+     * @return A perspective transformed Mat
+     */
+    private fun perspectiveTransform(src: Mat, points: List<PointF>): Mat? {
+        val point1 = Point(points[0].x.toDouble(), points[0].y.toDouble())
+        val point2 = Point(points[1].x.toDouble(), points[1].y.toDouble())
+        val point3 = Point(points[2].x.toDouble(), points[2].y.toDouble())
+        val point4 = Point(points[3].x.toDouble(), points[3].y.toDouble())
+        val pts = arrayOf(point1, point2, point3, point4)
+        return fourPointTransform(src, sortPoints(pts))
+    }
+
+    /**
+     * Apply a threshold to give the "scanned" look
+     *
+     * NOTE:
+     * See the following link for more info http://docs.opencv.org/3.1.0/d7/d4d/tutorial_py_thresholding.html#gsc.tab=0
+     * @param src A valid Mat
+     * @return The processed Bitmap
+     */
+    private fun applyThreshold(src: Mat): Bitmap? {
+        Imgproc.cvtColor(src, src, Imgproc.COLOR_BGR2GRAY)
+
+        // Some other approaches
+//        Imgproc.adaptiveThreshold(src, src, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, 15, 15);
+//        Imgproc.threshold(src, src, 0, 255, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU);
+        Imgproc.GaussianBlur(src, src, Size(5.0, 5.0), 0.0)
+        Imgproc.adaptiveThreshold(src, src, 255.0, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY, 11, 2.0)
+        val bm = Bitmap.createBitmap(src.width(), src.height(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(src, bm)
+        return bm
+    }
+
+    /**
+     * Sort the points
+     *
+     * The order of the points after sorting:
+     * 0------->1
+     * ^        |
+     * |        v
+     * 3<-------2
+     *
+     * NOTE:
+     * Based off of http://www.pyimagesearch.com/2014/08/25/4-point-opencv-getperspective-transform-example/
+     *
+     * @param src The points to sort
+     * @return An array of sorted points
+     */
+    private fun sortPoints(src: Array<Point>): Array<Point> {
+        val srcPoints = ArrayList(listOf(*src))
+        val result = arrayOf<Point>(Point(0.0,0.0), Point(0.0,0.0), Point(0.0,0.0), Point(0.0,0.0))
+
+        val sumComparator  = compareBy<Point> {it.y + it.x}
+        val differenceComparator =compareBy<Point> {it.y - it.x}
+        result[0] = Collections.min(srcPoints, sumComparator) // Upper left has the minimal sum
+        result[2] = Collections.max(srcPoints, sumComparator) // Lower right has the maximal sum
+        result[1] = Collections.min(srcPoints, differenceComparator) // Upper right has the minimal difference
+        result[3] = Collections.max(srcPoints, differenceComparator) // Lower left has the maximal difference
+        return result
+    }
+
+    /**
+     * NOTE:
+     * Based off of http://www.pyimagesearch.com/2014/08/25/4-point-opencv-getperspective-transform-example/
+     *
+     * @param src
+     * @param pts
+     * @return
+     */
+    private fun fourPointTransform(src: Mat, pts: Array<Point>): Mat {
+        val ratio = src.size().height / imageMaxHeight
+        val ul = pts[0]
+        val ur = pts[1]
+        val lr = pts[2]
+        val ll = pts[3]
+        val widthA = sqrt((lr.x - ll.x).pow(2.0) + (lr.y - ll.y).pow(2.0))
+        val widthB = sqrt((ur.x - ul.x).pow(2.0) + (ur.y - ul.y).pow(2.0))
+        val maxWidth = Math.max(widthA, widthB) * ratio
+        val heightA = sqrt((ur.x - lr.x).pow(2.0) + (ur.y - lr.y).pow(2.0))
+        val heightB = sqrt((ul.x - ll.x).pow(2.0) + (ul.y - ll.y).pow(2.0))
+        val maxHeight = Math.max(heightA, heightB) * ratio
+        val resultMat = Mat(java.lang.Double.valueOf(maxHeight).toInt(), java.lang.Double.valueOf(maxWidth).toInt(), CvType.CV_8UC4)
+        val srcMat = Mat(4, 1, CvType.CV_32FC2)
+        val dstMat = Mat(4, 1, CvType.CV_32FC2)
+        srcMat.put(0, 0, ul.x * ratio, ul.y * ratio, ur.x * ratio, ur.y * ratio, lr.x * ratio, lr.y * ratio, ll.x * ratio, ll.y * ratio)
+        dstMat.put(0, 0, 0.0, 0.0, maxWidth, 0.0, maxWidth, maxHeight, 0.0, maxHeight)
+        val M = Imgproc.getPerspectiveTransform(srcMat, dstMat)
+        Imgproc.warpPerspective(src, resultMat, M, resultMat.size())
+        srcMat.release()
+        dstMat.release()
+        M.release()
+        return resultMat
     }
 
     companion object {
