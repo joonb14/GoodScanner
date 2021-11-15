@@ -61,7 +61,7 @@ public class QuadrilateralSelectionImageView extends androidx.appcompat.widget.A
         mBorderPaint.setStrokeWidth(8);
 
         mCirclePaint = new Paint();
-        mBorderPaint.setColor(getResources().getColor(R.color.light_green_700));
+        mCirclePaint.setColor(getResources().getColor(R.color.light_green_700));
         mCirclePaint.setAntiAlias(true);
         mCirclePaint.setStyle(Paint.Style.STROKE);
         mCirclePaint.setStrokeWidth(8);
@@ -204,6 +204,19 @@ public class QuadrilateralSelectionImageView extends androidx.appcompat.widget.A
         list.add(viewPointToImagePoint(mLowerRightPoint));
         list.add(viewPointToImagePoint(mLowerLeftPoint));
         return list;
+    }
+
+    /**
+     * Deletes all the set points. Used by StillImageActivity's crop image button
+     * Re-initiallizing the points to erase lines and circles by onDraw call
+     *
+     * @return
+     */
+    public void deletePoints() {
+        mUpperLeftPoint = null;
+        mUpperRightPoint = null;
+        mLowerRightPoint = null;
+        mLowerLeftPoint = null;
     }
 
     /**

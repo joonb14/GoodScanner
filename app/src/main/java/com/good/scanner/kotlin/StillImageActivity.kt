@@ -94,6 +94,35 @@ class StillImageActivity : AppCompatActivity() {
                     inflater.inflate(R.menu.camera_button_menu, popup.menu)
                     popup.show()
                 }
+        findViewById<View>(R.id.crop_image_button)
+                .setOnClickListener{ view: View? ->
+                    if (imageUri == null) return@setOnClickListener
+                    if (SIZE_SCREEN == selectedSize && imageMaxWidth == 0) return@setOnClickListener // UI layout has not finished yet, will reload once it's ready.
+                    val imageBitmap = getBitmapFromContentUri(contentResolver, imageUri) ?: return@setOnClickListener
+
+                    val points: List<PointF> = preview!!.getPoints()
+                    graphicOverlay!!.clear() // Clear the overlay first
+                    val resizedBitmap = getResizedBitmap(imageBitmap)
+                    val utils = ImgProcUtils()
+                    val orig = utils.convertBitmapToMat(resizedBitmap)
+                    // TODO: Image preprocessing - Perspective Transform
+                    val transformed = perspectiveTransform(orig, points)
+                    // TODO: Image preprocessing - Thresholding (Result image should be black & white)
+                    val mResult = applyThreshold(transformed!!)
+                    val resizedResultBitmap = getResizedBitmap(mResult!!)
+                    preview!!.deletePoints()
+                    preview!!.setImageBitmap(resizedResultBitmap)
+                    orig.release()
+                    transformed.release()
+
+                    // TODO: Run AI Model - Text Recognition
+                    if (imageProcessor != null) {
+                        graphicOverlay!!.setImageSourceInfo(resizedResultBitmap.width, resizedBitmap.height, false)
+                        imageProcessor!!.processBitmap(resizedResultBitmap, graphicOverlay)
+                    } else {
+                        Log.e(TAG, "Null imageProcessor, please check adb logs for imageProcessor creation error")
+                    }
+                }
         preview = findViewById<QuadrilateralSelectionImageView>(R.id.preview)
         graphicOverlay = findViewById(R.id.graphic_overlay)
 
@@ -331,18 +360,14 @@ class StillImageActivity : AppCompatActivity() {
                 result.add(PointF(java.lang.Double.valueOf(points[2].x).toFloat(), java.lang.Double.valueOf(points[2].y).toFloat()))
                 result.add(PointF(java.lang.Double.valueOf(points[3].x).toFloat(), java.lang.Double.valueOf(points[3].y).toFloat()))
                 preview?.setPoints(result)
-                // TODO: Image preprocessing - Perspective Transform
-                // TODO: Image preprocessing - Thresholding (Result image should be black & white)
-
-                if (imageProcessor != null) {
-                    graphicOverlay!!.setImageSourceInfo(resizedBitmap.width, resizedBitmap.height, false)
-                    imageProcessor!!.processBitmap(resizedBitmap, graphicOverlay)
-                } else {
-                    Log.e(TAG, "Null imageProcessor, please check adb logs for imageProcessor creation error")
-                }
             } ?: {
                 preview?.setPoints(null)
             }
+            edgesMat.release()
+            blurredMat.release()
+            greyMat.release()
+            scaledImageMat.release()
+            imageMat.release()
 
         } catch (e: IOException) {
             Log.e(TAG, "Error retrieving saved image")
@@ -465,7 +490,7 @@ class StillImageActivity : AppCompatActivity() {
      * @return
      */
     private fun fourPointTransform(src: Mat, pts: Array<Point>): Mat {
-        val ratio = src.size().height / imageMaxHeight
+        val ratio = 1.0
         val ul = pts[0]
         val ur = pts[1]
         val lr = pts[2]
