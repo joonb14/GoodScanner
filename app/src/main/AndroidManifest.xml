@@ -47,7 +47,15 @@
         <activity
             android:name="com.good.scanner.kotlin.StillImageActivity"
             android:exported="true"
-            android:theme="@style/AppTheme"></activity>
+            android:theme="@style/AppTheme" />
+
+        <activity
+            android:name="com.good.scanner.kotlin.CropImageActivity"
+            android:exported="true" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.good.scanner.kotlin.StillImageActivity" />
+        </activity>
 
         <activity
             android:name="com.good.scanner.preference.SettingsActivity"
