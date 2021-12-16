@@ -52,28 +52,6 @@
           android:text="@string/select_image"/>
 
     </LinearLayout>
-    <LinearLayout
-        android:id="@+id/control2"
-        android:layout_width="match_parent"
-        android:layout_height="60dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        android:background="#000"
-        android:orientation="horizontal">
-
-      <Spinner
-          android:id="@+id/size_selector"
-          android:layout_width="0dp"
-          android:layout_weight="1"
-          android:layout_height="wrap_content"
-          android:layout_gravity="center"/>
-
-      <Spinner
-          android:id="@+id/feature_selector"
-          android:layout_width="0dp"
-          android:layout_weight="1"
-          android:layout_height="wrap_content"
-          android:layout_gravity="center"/>
-    </LinearLayout>
   </LinearLayout>
 
   <include

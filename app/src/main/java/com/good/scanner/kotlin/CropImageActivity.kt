@@ -59,7 +59,7 @@ class CropImageActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        setContentView(R.layout.activity_still_image)
+        setContentView(R.layout.activity_crop_image)
 
         if(intent.hasExtra(StillImageActivity.IMAGE_URI)) {
             imageUri = intent.getParcelableExtra(StillImageActivity.IMAGE_URI)

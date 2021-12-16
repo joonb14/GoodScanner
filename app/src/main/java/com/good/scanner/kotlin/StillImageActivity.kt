@@ -94,8 +94,6 @@ class StillImageActivity : AppCompatActivity() {
                     popup.show()
                 }
 
-        populateFeatureSelector()
-        populateSizeSelector()
         isLandScape =
                 resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         if (savedInstanceState != null) {
@@ -108,20 +106,6 @@ class StillImageActivity : AppCompatActivity() {
             selectedSize =
                     savedInstanceState.getString(com.good.scanner.kotlin.StillImageActivity.Companion.KEY_SELECTED_SIZE)
         }
-
-        val rootView = findViewById<View>(R.id.root)
-        rootView.viewTreeObserver.addOnGlobalLayoutListener(
-                object : ViewTreeObserver.OnGlobalLayoutListener {
-                    override fun onGlobalLayout() {
-                        rootView.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                        imageMaxWidth = rootView.width
-                        imageMaxHeight =
-                                rootView.height - findViewById<View>(R.id.control).height
-                        if (com.good.scanner.kotlin.StillImageActivity.Companion.SIZE_SCREEN == selectedSize) {
-                            // tryReloadAndDetectInImage()
-                        }
-                    }
-                })
 
         val settingsButton = findViewById<ImageView>(R.id.settings_button)
         settingsButton.setOnClickListener {
@@ -141,8 +125,6 @@ class StillImageActivity : AppCompatActivity() {
     public override fun onResume() {
         super.onResume()
         Log.d(com.good.scanner.kotlin.StillImageActivity.Companion.TAG, "onResume")
-        // createImageProcessor()
-        // tryReloadAndDetectInImage()
     }
 
     public override fun onPause() {
@@ -156,67 +138,6 @@ class StillImageActivity : AppCompatActivity() {
         super.onDestroy()
         imageProcessor?.run {
             this.stop()
-        }
-    }
-
-    private fun populateFeatureSelector() {
-        val featureSpinner = findViewById<Spinner>(R.id.feature_selector)
-        val options: MutableList<String> = ArrayList()
-        options.add(com.good.scanner.kotlin.StillImageActivity.Companion.TEXT_RECOGNITION_KOREAN)
-
-        // Creating adapter for featureSpinner
-        val dataAdapter =
-                ArrayAdapter(this, R.layout.spinner_style, options)
-        // Drop down layout style - list view with radio button
-        dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        // attaching data adapter to spinner
-        featureSpinner.adapter = dataAdapter
-        featureSpinner.onItemSelectedListener = object : OnItemSelectedListener {
-            override fun onItemSelected(
-                    parentView: AdapterView<*>,
-                    selectedItemView: View?,
-                    pos: Int,
-                    id: Long
-            ) {
-                if (pos >= 0) {
-                    selectedMode = parentView.getItemAtPosition(pos).toString()
-                    // createImageProcessor()
-                    // tryReloadAndDetectInImage()
-                }
-            }
-
-            override fun onNothingSelected(arg0: AdapterView<*>?) {}
-        }
-    }
-
-    private fun populateSizeSelector() {
-        val sizeSpinner = findViewById<Spinner>(R.id.size_selector)
-        val options: MutableList<String> = ArrayList()
-        options.add(com.good.scanner.kotlin.StillImageActivity.Companion.SIZE_SCREEN)
-        options.add(com.good.scanner.kotlin.StillImageActivity.Companion.SIZE_1024_768)
-        options.add(com.good.scanner.kotlin.StillImageActivity.Companion.SIZE_640_480)
-        options.add(com.good.scanner.kotlin.StillImageActivity.Companion.SIZE_ORIGINAL)
-        // Creating adapter for featureSpinner
-        val dataAdapter =
-                ArrayAdapter(this, R.layout.spinner_style, options)
-        // Drop down layout style - list view with radio button
-        dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        // attaching data adapter to spinner
-        sizeSpinner.adapter = dataAdapter
-        sizeSpinner.onItemSelectedListener = object : OnItemSelectedListener {
-            override fun onItemSelected(
-                    parentView: AdapterView<*>,
-                    selectedItemView: View?,
-                    pos: Int,
-                    id: Long
-            ) {
-                if (pos >= 0) {
-                    selectedSize = parentView.getItemAtPosition(pos).toString()
-                    // tryReloadAndDetectInImage()
-                }
-            }
-
-            override fun onNothingSelected(arg0: AdapterView<*>?) {}
         }
     }
 
@@ -255,38 +176,22 @@ class StillImageActivity : AppCompatActivity() {
     ) {
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == Activity.RESULT_OK) {
             // TODO: Intent를 이용하여 다른 Activity로 image uri 넘기기
-            // startCropImageActivity()
+            val intent = Intent(this, CropImageActivity::class.java).apply {
+                putExtra(IMAGE_URI, imageUri)
+            }
+            startActivity(intent)
         } else if (requestCode == REQUEST_CHOOSE_IMAGE && resultCode == Activity.RESULT_OK) {
             // In this case, imageUri is returned by the chooser, save it.
             imageUri = data!!.data
             // TODO: Intent를 이용하여 다른 Activity로 image uri 넘기기
-            // startCropImageActivity()
+             val intent = Intent(this, CropImageActivity::class.java).apply {
+                 putExtra(IMAGE_URI, imageUri)
+             }
+             startActivity(intent)
         } else {
             super.onActivityResult(requestCode, resultCode, data)
         }
     }
-
-    private val targetedWidthHeight: Pair<Int, Int>
-        get() {
-            val targetWidth: Int
-            val targetHeight: Int
-            when (selectedSize) {
-                SIZE_SCREEN -> {
-                    targetWidth = imageMaxWidth
-                    targetHeight = imageMaxHeight
-                }
-                SIZE_640_480 -> {
-                    targetWidth = if (isLandScape) 640 else 480
-                    targetHeight = if (isLandScape) 480 else 640
-                }
-                SIZE_1024_768 -> {
-                    targetWidth = if (isLandScape) 1024 else 768
-                    targetHeight = if (isLandScape) 768 else 1024
-                }
-                else -> throw IllegalStateException("Unknown size")
-            }
-            return Pair(targetWidth, targetHeight)
-        }
 
     companion object {
         private const val TAG = "StillImageActivity"
