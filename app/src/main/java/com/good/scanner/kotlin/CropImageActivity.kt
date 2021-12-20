@@ -80,7 +80,6 @@ class CropImageActivity : AppCompatActivity() {
                 // TODO: Image preprocessing - Thresholding (Result image should be black & white)
                 val mResult = applyThreshold(transformed!!)
                 val resizedResultBitmap = getResizedBitmap(mResult!!)
-                preview?.setPoints(null)
                 orig.release()
                 transformed.release()
 
