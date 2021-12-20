@@ -1,29 +1,23 @@
 package com.good.scanner.kotlin
 
 
-import android.app.Activity
-import android.content.ContentValues
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.PointF
 import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
 import android.util.Log
 import android.util.Pair
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewTreeObserver
-import android.widget.*
-import android.widget.AdapterView.OnItemSelectedListener
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.good.scanner.BitmapUtils.getBitmapFromContentUri
 import com.good.scanner.GraphicOverlay
 import com.good.scanner.ImgProcUtils
 import com.good.scanner.VisionImageProcessor
 import com.good.scanner.kotlin.textdetector.TextRecognitionProcessor
-import com.good.scanner.preference.SettingsActivity.LaunchSource
 import com.google.android.gms.common.annotation.KeepName
 import com.google.mlkit.vision.demo.R
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
@@ -34,6 +28,7 @@ import org.opencv.core.Mat
 import org.opencv.core.Point
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.util.*
 import kotlin.math.pow
@@ -70,34 +65,34 @@ class CropImageActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.crop_image_button)
-                .setOnClickListener{ view: View? ->
-                    if (imageUri == null) return@setOnClickListener
-                    if (SIZE_SCREEN == selectedSize && imageMaxWidth == 0) return@setOnClickListener // UI layout has not finished yet, will reload once it's ready.
-                    val imageBitmap = getBitmapFromContentUri(contentResolver, imageUri) ?: return@setOnClickListener
+            .setOnClickListener{ view: View? ->
+                if (imageUri == null) return@setOnClickListener
+                if (SIZE_SCREEN == selectedSize && imageMaxWidth == 0) return@setOnClickListener // UI layout has not finished yet, will reload once it's ready.
+                val imageBitmap = getBitmapFromContentUri(contentResolver, imageUri) ?: return@setOnClickListener
 
-                    val points: List<PointF> = preview!!.getPoints()
-                    graphicOverlay!!.clear() // Clear the overlay first
-                    val resizedBitmap = getResizedBitmap(imageBitmap)
-                    val utils = ImgProcUtils()
-                    val orig = utils.convertBitmapToMat(resizedBitmap)
-                    // TODO: Image preprocessing - Perspective Transform
-                    val transformed = perspectiveTransform(orig, points)
-                    // TODO: Image preprocessing - Thresholding (Result image should be black & white)
-                    val mResult = applyThreshold(transformed!!)
-                    val resizedResultBitmap = getResizedBitmap(mResult!!)
-                    preview!!.deletePoints()
-                    preview!!.setImageBitmap(resizedResultBitmap)
-                    orig.release()
-                    transformed.release()
+                val points: List<PointF> = preview!!.getPoints()
+                graphicOverlay!!.clear() // Clear the overlay first
+                val resizedBitmap = getResizedBitmap(imageBitmap)
+                val utils = ImgProcUtils()
+                val orig = utils.convertBitmapToMat(resizedBitmap)
+                // TODO: Image preprocessing - Perspective Transform
+                val transformed = perspectiveTransform(orig, points)
+                // TODO: Image preprocessing - Thresholding (Result image should be black & white)
+                val mResult = applyThreshold(transformed!!)
+                val resizedResultBitmap = getResizedBitmap(mResult!!)
+                preview?.setPoints(null)
+                orig.release()
+                transformed.release()
 
-                    // TODO: Run AI Model - Text Recognition
-                    if (imageProcessor != null) {
-                        graphicOverlay!!.setImageSourceInfo(resizedResultBitmap.width, resizedBitmap.height, false)
-                        imageProcessor!!.processBitmap(resizedResultBitmap, graphicOverlay)
-                    } else {
-                        Log.e(TAG, "Null imageProcessor, please check adb logs for imageProcessor creation error")
-                    }
+                val intent = Intent(this, TextRecognitionActivity::class.java).apply {
+                    val stream = ByteArrayOutputStream()
+                    resizedResultBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                    val byteArray: ByteArray = stream.toByteArray()
+                    putExtra(CropImageActivity.PROCESSED_BITMAP, byteArray)
                 }
+                startActivity(intent)
+            }
+
         preview = findViewById<QuadrilateralSelectionImageView>(R.id.preview)
         graphicOverlay = findViewById(R.id.graphic_overlay)
 
@@ -387,8 +382,7 @@ class CropImageActivity : AppCompatActivity() {
         private const val KEY_IMAGE_MAX_WIDTH = "com.google.mlkit.vision.demo.KEY_IMAGE_MAX_WIDTH"
         private const val KEY_IMAGE_MAX_HEIGHT = "com.google.mlkit.vision.demo.KEY_IMAGE_MAX_HEIGHT"
         private const val KEY_SELECTED_SIZE = "com.google.mlkit.vision.demo.KEY_SELECTED_SIZE"
-        private const val REQUEST_IMAGE_CAPTURE = 1001
-        private const val REQUEST_CHOOSE_IMAGE = 1002
+        public const val PROCESSED_BITMAP = "Processed Bitmap"
 
         init {
             if (!OpenCVLoader.initDebug()) {

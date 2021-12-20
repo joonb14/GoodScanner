@@ -58,6 +58,14 @@
         </activity>
 
         <activity
+            android:name="com.good.scanner.kotlin.TextRecognitionActivity"
+            android:exported="true" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.good.scanner.kotlin.CropImageActivity" />
+        </activity>
+
+        <activity
             android:name="com.good.scanner.preference.SettingsActivity"
             android:exported="false" />
 
