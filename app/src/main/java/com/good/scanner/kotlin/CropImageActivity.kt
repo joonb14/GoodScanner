@@ -11,16 +11,12 @@ import android.util.Log
 import android.util.Pair
 import android.view.View
 import android.view.ViewTreeObserver
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.good.scanner.BitmapUtils.getBitmapFromContentUri
 import com.good.scanner.GraphicOverlay
 import com.good.scanner.ImgProcUtils
-import com.good.scanner.VisionImageProcessor
-import com.good.scanner.kotlin.textdetector.TextRecognitionProcessor
 import com.google.android.gms.common.annotation.KeepName
 import com.google.mlkit.vision.demo.R
-import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.CvType
@@ -50,7 +46,6 @@ class CropImageActivity : AppCompatActivity() {
 
     // Max height (portrait mode)
     private var imageMaxHeight = 0
-    private var imageProcessor: VisionImageProcessor? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -126,22 +121,15 @@ class CropImageActivity : AppCompatActivity() {
     public override fun onResume() {
         super.onResume()
         Log.d(CropImageActivity.TAG, "onResume")
-        createImageProcessor()
         tryReloadAndDetectInImage()
     }
 
     public override fun onPause() {
         super.onPause()
-        imageProcessor?.run {
-            this.stop()
-        }
     }
 
     public override fun onDestroy() {
         super.onDestroy()
-        imageProcessor?.run {
-            this.stop()
-        }
     }
 
     public override fun onSaveInstanceState(outState: Bundle) {
@@ -251,25 +239,6 @@ class CropImageActivity : AppCompatActivity() {
             }
             return Pair(targetWidth, targetHeight)
         }
-
-    private fun createImageProcessor() {
-        try {
-            when (selectedMode) {
-                TEXT_RECOGNITION_KOREAN ->
-                    imageProcessor =
-                            TextRecognitionProcessor(this, KoreanTextRecognizerOptions.Builder().build())
-                else -> Log.e(TAG, "Unknown selectedMode: $selectedMode")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Can not create image processor: $selectedMode", e)
-            Toast.makeText(
-                    applicationContext,
-                    "Can not create image processor: " + e.message,
-                    Toast.LENGTH_LONG
-            )
-                    .show()
-        }
-    }
 
     /**
      * Transform the coordinates on the given Mat to correct the perspective.

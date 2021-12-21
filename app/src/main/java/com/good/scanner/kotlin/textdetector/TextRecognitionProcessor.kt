@@ -18,6 +18,8 @@ package com.good.scanner.kotlin.textdetector
 
 import android.content.Context
 import android.util.Log
+import android.widget.TextView
+import com.good.scanner.kotlin.TextRecognitionActivity
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
 import com.good.scanner.kotlin.VisionProcessorBase
@@ -27,9 +29,10 @@ import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.TextRecognizerOptionsInterface
 
 /** Processor for the text detector demo.  */
-class TextRecognitionProcessor(private val context: Context, textRecognizerOptions: TextRecognizerOptionsInterface) : VisionProcessorBase<Text>(context) {
+class TextRecognitionProcessor(private val context: Context, textRecognizerOptions: TextRecognizerOptionsInterface, textView : TextView) : VisionProcessorBase<Text>(context) {
     private val textRecognizer: TextRecognizer = TextRecognition.getClient(textRecognizerOptions)
     private val shouldGroupRecognizedTextInBlocks: Boolean = com.good.scanner.preference.PreferenceUtils.shouldGroupRecognizedTextInBlocks(context)
+    private val textView : TextView = textView
 
     override fun stop() {
         super.stop()
@@ -45,6 +48,7 @@ class TextRecognitionProcessor(private val context: Context, textRecognizerOptio
         logExtrasForTesting(text)
         graphicOverlay.add(
                 TextGraphic(graphicOverlay, text, shouldGroupRecognizedTextInBlocks))
+        textView.text = text.text;
     }
 
     override fun onFailure(e: Exception) {

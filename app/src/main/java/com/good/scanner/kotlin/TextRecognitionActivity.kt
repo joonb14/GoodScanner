@@ -11,6 +11,7 @@ import android.util.Pair
 import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.good.scanner.GraphicOverlay
@@ -18,6 +19,7 @@ import com.good.scanner.VisionImageProcessor
 import com.good.scanner.kotlin.textdetector.TextRecognitionProcessor
 import com.google.android.gms.common.annotation.KeepName
 import com.google.mlkit.vision.demo.R
+import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import org.opencv.android.OpenCVLoader
 
@@ -37,8 +39,10 @@ class TextRecognitionActivity : AppCompatActivity() {
 
     // Max height (portrait mode)
     private var imageMaxHeight = 0
-    private var imageProcessor: VisionImageProcessor? = null
+    private var imageProcessor: TextRecognitionProcessor? = null
     private var resizedResultBitmap: Bitmap ?= null
+    var textView:TextView ?= null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -69,6 +73,27 @@ class TextRecognitionActivity : AppCompatActivity() {
                     savedInstanceState.getString(TextRecognitionActivity.KEY_SELECTED_SIZE)
         }
 
+        textView = findViewById<View>(R.id.textView) as TextView
+        val inferenceButton = findViewById<View>(R.id.model_inference_button)
+        inferenceButton.setOnClickListener{ view: android.view.View? ->
+            createImageProcessor()
+            // TODO: Run AI Model - Text Recognition
+            if (imageProcessor != null) {
+                Log.d(TAG, "imageProcessor creation success")
+                graphicOverlay!!.clear()
+                graphicOverlay!!.setImageSourceInfo(resizedResultBitmap!!.width, resizedResultBitmap!!.height, false)
+                imageProcessor
+                imageProcessor!!.processBitmap(resizedResultBitmap, graphicOverlay!!)
+                // TODO : imageProcessor가 찾은 Text 받아서 textView에 출력하기
+                inferenceButton.visibility = View.GONE
+                val scrollView = findViewById<View>(R.id.scrollview)
+                scrollView.layoutParams.height *= 5 // resize scrollview
+
+            } else {
+                Log.e(TAG, "Null imageProcessor, please check adb logs for imageProcessor creation error")
+            }
+        }
+
         val rootView = findViewById<View>(R.id.root)
         rootView.viewTreeObserver.addOnGlobalLayoutListener(
                 object : ViewTreeObserver.OnGlobalLayoutListener {
@@ -77,25 +102,9 @@ class TextRecognitionActivity : AppCompatActivity() {
                         imageMaxWidth = rootView.width
                         imageMaxHeight =
                                 rootView.height - findViewById<View>(R.id.control).height
-                        if (TextRecognitionActivity.SIZE_SCREEN == selectedSize) {
-                            // TODO : show bitmap as image
-                        }
                     }
                 })
 
-        findViewById<View>(R.id.model_inference_button)
-                .setOnClickListener{ view: android.view.View? ->
-                    createImageProcessor()
-                    // TODO: Run AI Model - Text Recognition
-                    if (imageProcessor != null) {
-                        Log.d(TAG, "imageProcessor creation success")
-                        graphicOverlay!!.clear()
-                        graphicOverlay!!.setImageSourceInfo(resizedResultBitmap!!.width, resizedResultBitmap!!.height, false)
-                        imageProcessor!!.processBitmap(resizedResultBitmap, graphicOverlay)
-                    } else {
-                        Log.e(TAG, "Null imageProcessor, please check adb logs for imageProcessor creation error")
-                    }
-                }
     }
 
     public override fun onResume() {
@@ -132,7 +141,7 @@ class TextRecognitionActivity : AppCompatActivity() {
             when (selectedMode) {
                 TEXT_RECOGNITION_KOREAN ->
                     imageProcessor =
-                            TextRecognitionProcessor(this, KoreanTextRecognizerOptions.Builder().build())
+                            TextRecognitionProcessor(this, KoreanTextRecognizerOptions.Builder().build(), textView!!)
                 else -> Log.e(TAG, "Unknown selectedMode: $selectedMode")
             }
         } catch (e: Exception) {
@@ -147,6 +156,7 @@ class TextRecognitionActivity : AppCompatActivity() {
     }
 
     companion object {
+        var text: Text? = null;
         private const val TAG = "TextRecognitionActivity"
         private const val TEXT_RECOGNITION_KOREAN = "Text Recognition Korean"
 

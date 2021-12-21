@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.google.mlkit.vision.text.Text;
 
 /**
  * A view which renders a series of custom graphics to be overlayed on top of an associated preview
@@ -65,6 +66,15 @@ public class GraphicOverlay extends View {
     private float postScaleHeightOffset;
     private boolean isImageFlipped;
     private boolean needUpdateTransformation = true;
+
+    // TODO : To get text information (Done)
+    private Text text;
+    public Text getText() {
+        return text;
+    }
+    public void setText(Text text) {
+        this.text = text;
+    }
 
     /**
      * Base class for a custom graphics object to be rendered within the graphic overlay. Subclass
@@ -139,6 +149,7 @@ public class GraphicOverlay extends View {
         public void postInvalidate() {
             overlay.postInvalidate();
         }
+
     }
 
     public GraphicOverlay(Context context, AttributeSet attrs) {
